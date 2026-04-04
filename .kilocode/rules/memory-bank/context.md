@@ -1,87 +1,51 @@
-# Active Context: Next.js Starter Template
+# Active Context: Catalon-Guard Dashboard + Windows-first DX
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
+**Template Status**: ✅ Dashboard mockup exists, Windows-native setup is available, and a portable Windows bundle build path is documented.
 
-The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. It's ready for AI-assisted expansion to build any type of application.
+The project now includes dedicated Windows scripts for dependency installation and proxy startup, plus cross-platform `.env` handling so users can run Catalon-Guard directly on Windows.
 
 ## Recently Completed
 
-- [x] Base Next.js 16 setup with App Router
-- [x] TypeScript configuration with strict mode
-- [x] Tailwind CSS 4 integration
-- [x] ESLint configuration
-- [x] Memory bank documentation
-- [x] Recipe system for common features
+- [x] Added Windows environment template file: `catalon-guard/.env.template`
+- [x] Added Windows setup script: `catalon-guard/setup_windows.ps1`
+- [x] Added Windows run script: `catalon-guard/run_proxy_windows.ps1`
+- [x] Rewrote `catalon-guard/README.md` with Windows-first Quick Start (no WSL required)
+- [x] Updated Linux setup script to use `.env.template` + `python3 -m pip`
+- [x] Updated Linux run script to auto-load `.env` with `KEY=VALUE` compatibility
+- [x] Added portable Windows bundle builder: `catalon-guard/portable/build_portable.ps1`
+- [x] Documented portable distribution flow in README (no global dependencies on target machine)
+- [x] Hardened portable build script with Python 3.11/3.12 selection and binary-wheel install strategy for `orjson`
+- [x] Fixed portable launcher entrypoint to call `runtime\Scripts\litellm.exe` (not `python -m litellm`)
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Global styles | ✅ Ready |
-| `.kilocode/` | AI context & recipes | ✅ Ready |
+| `src/app/page.tsx` | Pretext-inspired Catalon-Guard dashboard GUI | ✅ Implemented |
+| `catalon-guard/setup_windows.ps1` | Windows setup flow | ✅ Implemented |
+| `catalon-guard/run_proxy_windows.ps1` | Windows proxy startup flow | ✅ Implemented |
+| `catalon-guard/setup.sh` | Linux/macOS setup flow | ✅ Updated |
+| `catalon-guard/run_proxy.sh` | Linux/macOS startup flow | ✅ Updated |
+| `catalon-guard/README.md` | Windows-first usage docs | ✅ Updated |
 
 ## Current Focus
 
-The template is ready. Next steps depend on user requirements:
+Next likely steps for this project:
 
-1. What type of application to build
-2. What features are needed
-3. Design/branding preferences
-
-## Quick Start Guide
-
-### To add a new page:
-
-Create a file at `src/app/[route]/page.tsx`:
-```tsx
-export default function NewPage() {
-  return <div>New page content</div>;
-}
-```
-
-### To add components:
-
-Create `src/components/` directory and add components:
-```tsx
-// src/components/ui/Button.tsx
-export function Button({ children }: { children: React.ReactNode }) {
-  return <button className="px-4 py-2 bg-blue-600 text-white rounded">{children}</button>;
-}
-```
-
-### To add a database:
-
-Follow `.kilocode/recipes/add-database.md`
-
-### To add API routes:
-
-Create `src/app/api/[route]/route.ts`:
-```tsx
-import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Hello" });
-}
-```
-
-## Available Recipes
-
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] Add more recipes (auth, email, etc.)
-- [ ] Add example components
-- [ ] Add testing setup recipe
+1. Connect dashboard cards and tables to real proxy/runtime metrics
+2. Add direct model CRUD actions in UI (replace manual CLI loop)
+3. Add trends/charts for spend and latency over time
 
 ## Session History
 
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
+| 2026-04-03 | Implemented initial Catalon-Guard dashboard UI mockup and dark global styling updates. |
+| 2026-04-03 | Refined dashboard into a Pretext-inspired UI pass with calmer typography and improved scanability. |
+| 2026-04-04 | Added native Windows setup/start scripts and rewrote docs for Windows-first usage without WSL. |
+| 2026-04-04 | Added portable Windows bundle build script (`portable/build_portable.ps1`) and README instructions for no-global-dependency distribution. |
+| 2026-04-04 | Fixed portable build reliability for `orjson` wheel build failures by enforcing Python 3.11/3.12 and binary wheel installation. |
+| 2026-04-04 | Fixed portable startup error (`No module named litellm.__main__`) by switching launcher to `runtime\Scripts\litellm.exe`. |
