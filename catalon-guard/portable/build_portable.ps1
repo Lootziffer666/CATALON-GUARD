@@ -82,7 +82,12 @@ if "%LITELLM_MASTER_KEY%"=="" set LITELLM_MASTER_KEY=sk-catalon-safe-key
 echo Starting LiteLLM Proxy...
 echo Dashboard: http://localhost:4000/ui
 echo API:       http://localhost:4000/v1
-runtime\Scripts\python.exe -m litellm --config config.yaml --port 4000 --debug
+if not exist runtime\Scripts\litellm.exe (
+  echo ERROR: runtime\Scripts\litellm.exe not found. Portable build incomplete.
+  pause
+  exit /b 1
+)
+runtime\Scripts\litellm.exe --config config.yaml --port 4000 --debug
 exit /b %errorlevel%
 
 :setLine

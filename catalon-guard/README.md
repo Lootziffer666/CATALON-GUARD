@@ -41,6 +41,8 @@ cd CatalonGuardPortable
 
 Beim ersten Start wird `.env` aus `.env.template` angelegt.
 
+Hinweis: Wenn du zuvor den Fehler `No module named litellm.__main__` gesehen hast, bitte das Portable Bundle mit der aktuellen Version von `build_portable.ps1` neu erzeugen.
+
 ## Alternative: Linux/macOS
 
 ```bash
