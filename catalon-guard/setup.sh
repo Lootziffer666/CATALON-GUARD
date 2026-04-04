@@ -13,7 +13,7 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 echo "Installing LiteLLM with proxy dependencies..."
-python3 -m pip install 'litellm[proxy]' requests
+python3 -m pip install 'litellm[proxy]' requests prometheus-client
 
 echo ""
 if [ ! -f .env ]; then

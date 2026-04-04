@@ -18,6 +18,7 @@ The project now includes dedicated Windows scripts for dependency installation a
 - [x] Documented portable distribution flow in README (no global dependencies on target machine)
 - [x] Hardened portable build script with Python 3.11/3.12 selection and binary-wheel install strategy for `orjson`
 - [x] Fixed portable launcher entrypoint to call `runtime\Scripts\litellm.exe` (not `python -m litellm`)
+- [x] Added explicit `prometheus-client` installation in setup + portable build scripts to prevent startup ModuleNotFoundError
 
 ## Current Structure
 
@@ -49,3 +50,4 @@ Next likely steps for this project:
 | 2026-04-04 | Added portable Windows bundle build script (`portable/build_portable.ps1`) and README instructions for no-global-dependency distribution. |
 | 2026-04-04 | Fixed portable build reliability for `orjson` wheel build failures by enforcing Python 3.11/3.12 and binary wheel installation. |
 | 2026-04-04 | Fixed portable startup error (`No module named litellm.__main__`) by switching launcher to `runtime\Scripts\litellm.exe`. |
+| 2026-04-04 | Fixed startup error `No module named prometheus_client` by explicitly installing `prometheus-client` in setup and portable build flows. |

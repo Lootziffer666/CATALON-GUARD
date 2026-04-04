@@ -17,7 +17,7 @@ if (Get-Command py -ErrorAction SilentlyContinue) {
 
 Write-Host "Using Python command: $pythonCmd"
 Write-Host "Installing LiteLLM + proxy dependencies..."
-& $pythonCmd -m pip install "litellm[proxy]" requests
+& $pythonCmd -m pip install "litellm[proxy]" requests prometheus-client
 
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.template" ".env"

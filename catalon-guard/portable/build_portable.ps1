@@ -52,7 +52,7 @@ $pyExe = Join-Path $runtime "Scripts\python.exe"
 
 # Force binary wheels for orjson to avoid Rust toolchain/source builds.
 & $pyExe -m pip install --only-binary=:all: "orjson==3.10.16"
-& $pyExe -m pip install --prefer-binary --only-binary=orjson "litellm[proxy]" requests
+& $pyExe -m pip install --prefer-binary --only-binary=orjson "litellm[proxy]" requests prometheus-client
 
 Copy-Item (Join-Path $root "config.yaml") (Join-Path $bundle "config.yaml")
 Copy-Item (Join-Path $root ".env.template") (Join-Path $bundle ".env.template")

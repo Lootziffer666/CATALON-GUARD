@@ -203,3 +203,4 @@ python guard_stats.py --api-key sk-catalon-safe-key
 | 429 Budget exceeded | Wait for reset or increase limit in `config.yaml` |
 | Vertex error | Check `GOOGLE_APPLICATION_CREDENTIALS` path |
 | OpenRouter error | Verify `OPENROUTER_API_KEY` in `.env` |
+| `No module named 'prometheus_client'` | Setup erneut ausführen (`.\setup_windows.ps1` oder `./setup.sh`) und Portable Bundle neu bauen |
