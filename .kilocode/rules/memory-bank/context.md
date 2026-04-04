@@ -1,26 +1,32 @@
-# Active Context: Catalon-Guard Dashboard UI
+# Active Context: Catalon-Guard Dashboard + Windows-first DX
 
 ## Current State
 
-**Template Status**: ✅ Home page now has a refined, Pretext-inspired operations dashboard mockup.
+**Template Status**: ✅ Dashboard mockup exists, Windows-native setup is available, and a portable Windows bundle build path is documented.
 
-The UI has shifted from a generic admin style to a calmer editorial-ops look with stronger typography hierarchy and reduced visual noise, while keeping focus on budget guardrails, routing status, and operator-relevant signals.
+The project now includes dedicated Windows scripts for dependency installation and proxy startup, plus cross-platform `.env` handling so users can run Catalon-Guard directly on Windows.
 
 ## Recently Completed
 
-- [x] Reworked homepage visual language toward a Pretext-inspired style (cleaner typography, calmer blocks)
-- [x] Kept core operational widgets: KPIs, model routing matrix, and timeline/status context
-- [x] Simplified layout hierarchy for faster scanning in ops workflows
-- [x] Preserved dark-mode baseline styles for consistency
+- [x] Added Windows environment template file: `catalon-guard/.env.template`
+- [x] Added Windows setup script: `catalon-guard/setup_windows.ps1`
+- [x] Added Windows run script: `catalon-guard/run_proxy_windows.ps1`
+- [x] Rewrote `catalon-guard/README.md` with Windows-first Quick Start (no WSL required)
+- [x] Updated Linux setup script to use `.env.template` + `python3 -m pip`
+- [x] Updated Linux run script to auto-load `.env` with `KEY=VALUE` compatibility
+- [x] Added portable Windows bundle builder: `catalon-guard/portable/build_portable.ps1`
+- [x] Documented portable distribution flow in README (no global dependencies on target machine)
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
 | `src/app/page.tsx` | Pretext-inspired Catalon-Guard dashboard GUI | ✅ Implemented |
-| `src/app/layout.tsx` | Root layout | ✅ Ready |
-| `src/app/globals.css` | Tailwind import + dark baseline styles | ✅ Updated |
-| `.kilocode/` | AI context & recipes | ✅ Maintained |
+| `catalon-guard/setup_windows.ps1` | Windows setup flow | ✅ Implemented |
+| `catalon-guard/run_proxy_windows.ps1` | Windows proxy startup flow | ✅ Implemented |
+| `catalon-guard/setup.sh` | Linux/macOS setup flow | ✅ Updated |
+| `catalon-guard/run_proxy.sh` | Linux/macOS startup flow | ✅ Updated |
+| `catalon-guard/README.md` | Windows-first usage docs | ✅ Updated |
 
 ## Current Focus
 
@@ -37,3 +43,5 @@ Next likely steps for this project:
 | Initial | Template created with base setup |
 | 2026-04-03 | Implemented initial Catalon-Guard dashboard UI mockup and dark global styling updates. |
 | 2026-04-03 | Refined dashboard into a Pretext-inspired UI pass with calmer typography and improved scanability. |
+| 2026-04-04 | Added native Windows setup/start scripts and rewrote docs for Windows-first usage without WSL. |
+| 2026-04-04 | Added portable Windows bundle build script (`portable/build_portable.ps1`) and README instructions for no-global-dependency distribution. |
