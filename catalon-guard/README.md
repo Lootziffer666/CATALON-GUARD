@@ -1,18 +1,54 @@
 # Catalon-Guard - V1.0 Infrastruktur & Kosten-Schild
 
-## Quick Start
+## Quick Start (Windows, ohne WSL)
+
+> Alle Schritte in **PowerShell** ausführen.
+
+```powershell
+# 1) In den Projektordner wechseln
+cd catalon-guard
+
+# 2) Dependencies installieren + .env anlegen
+.\setup_windows.ps1
+
+# 3) .env bearbeiten (API Keys + Credentials)
+notepad .env
+
+# 4) Proxy starten
+.\run_proxy_windows.ps1
+```
+
+## Portable (Windows, ohne globale Dependency-Installation)
+
+Ja, geht: Du kannst ein **portables Bundle** bauen, das eine lokale Runtime inkl. Dependencies enthält. Auf dem Zielrechner brauchst du dann weder WSL noch eine globale Python-Installation.
+
+> Build-Maschine: Python **3.11 oder 3.12 (64-bit)** empfohlen (verhindert `orjson` Build-Fehler).
+
+```powershell
+cd catalon-guard\portable
+.\build_portable.ps1
+
+# optional: als ZIP verteilen
+Compress-Archive -Path ..\dist\CatalonGuardPortable\* -DestinationPath ..\dist\CatalonGuardPortable.zip -Force
+```
+
+Danach reicht auf dem Zielsystem:
+
+```powershell
+cd CatalonGuardPortable
+.\start_portable.bat
+```
+
+Beim ersten Start wird `.env` aus `.env.template` angelegt.
+
+## Alternative: Linux/macOS
 
 ```bash
-# 1. Install dependencies
 cd catalon-guard
 chmod +x setup.sh run_proxy.sh
 ./setup.sh
-
-# 2. Configure environment
 cp .env.template .env
-# Edit .env with your API keys
-
-# 3. Start proxy
+# .env bearbeiten
 source .env
 ./run_proxy.sh
 ```
@@ -22,10 +58,13 @@ source .env
 | File | Purpose |
 |------|---------|
 | `config.yaml` | Main LiteLLM configuration |
-| `run_proxy.sh` | Start the proxy server |
+| `run_proxy_windows.ps1` | Start proxy on Windows |
+| `run_proxy.sh` | Start proxy on Linux/macOS |
 | `guard_stats.py` | Real-time budget monitoring |
 | `model_manager.py` | Add/remove models dynamically |
-| `setup.sh` | First-time setup |
+| `setup_windows.ps1` | Windows setup |
+| `setup.sh` | Linux/macOS setup |
+| `.env.template` | Environment template for all platforms |
 
 ## Models (Pre-configured)
 
@@ -56,7 +95,7 @@ model_list:
       # ... other params
 ```
 
-Then restart: `./run_proxy.sh`
+Then restart proxy (`.\run_proxy_windows.ps1` on Windows / `./run_proxy.sh` on Linux).
 
 ### Method 2: Dynamic (no restart)
 
@@ -157,8 +196,8 @@ python guard_stats.py --api-key sk-catalon-safe-key
 
 | Error | Solution |
 |-------|----------|
-| Connection refused | Proxy not running. Run `./run_proxy.sh` |
-| 401 Unauthorized | Check `LITELLM_MASTER_KEY` in .env |
-| 429 Budget exceeded | Wait for reset or increase limit in config.yaml |
+| Connection refused | Proxy not running. Run `.\\run_proxy_windows.ps1` (Windows) or `./run_proxy.sh` (Linux/macOS) |
+| 401 Unauthorized | Check `LITELLM_MASTER_KEY` in `.env` |
+| 429 Budget exceeded | Wait for reset or increase limit in `config.yaml` |
 | Vertex error | Check `GOOGLE_APPLICATION_CREDENTIALS` path |
-| OpenRouter error | Verify `OPENROUTER_API_KEY` in .env |
+| OpenRouter error | Verify `OPENROUTER_API_KEY` in `.env` |

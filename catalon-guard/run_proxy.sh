@@ -12,10 +12,19 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Catalon-Guard Proxy Startup ===${NC}"
 
+cd "$(dirname "$0")"
+
+# Auto-load .env if present (supports KEY=VALUE and optional export KEY=VALUE)
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 # Check for required environment variables
 if [ -z "$GOOGLE_PROJECT_ID" ]; then
     echo -e "${RED}ERROR: GOOGLE_PROJECT_ID not set${NC}"
-    echo "Export it with: export GOOGLE_PROJECT_ID=\"your-project-id\""
+    echo "Set it in .env as GOOGLE_PROJECT_ID=your-project-id"
     exit 1
 fi
 
@@ -35,7 +44,7 @@ fi
 
 if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     echo -e "${YELLOW}WARNING: GOOGLE_APPLICATION_CREDENTIALS not set${NC}"
-    echo "Set with: export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/credentials.json\""
+    echo "Set in .env as GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json"
 fi
 
 echo -e "${GREEN}Environment check passed${NC}"
@@ -43,7 +52,7 @@ echo "Project: $GOOGLE_PROJECT_ID"
 echo "Location: $GOOGLE_LOCATION"
 
 # Check if config exists
-if [ ! -f "$(dirname "$0")/config.yaml" ]; then
+if [ ! -f "config.yaml" ]; then
     echo -e "${RED}ERROR: config.yaml not found${NC}"
     exit 1
 fi
@@ -56,5 +65,4 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 # Start the proxy
-cd "$(dirname "$0")"
 litellm --config config.yaml --port 4000 --debug
