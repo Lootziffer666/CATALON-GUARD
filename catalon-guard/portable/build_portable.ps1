@@ -1,10 +1,39 @@
 # Build a portable Windows bundle for Catalon-Guard (no WSL, no global Python needed on target machine)
+# IMPORTANT: Build machine should have Python 3.11 or 3.12 installed.
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $distRoot = Join-Path $root "dist"
 $bundle = Join-Path $distRoot "CatalonGuardPortable"
 $runtime = Join-Path $bundle "runtime"
+
+function Resolve-BuildPython {
+    # Prefer versions with broad binary wheel support (avoids building orjson from source)
+    $candidates = @(
+        @{ Cmd = "py"; Args = @("-3.12") },
+        @{ Cmd = "py"; Args = @("-3.11") },
+        @{ Cmd = "python"; Args = @() }
+    )
+
+    foreach ($candidate in $candidates) {
+        if (-not (Get-Command $candidate.Cmd -ErrorAction SilentlyContinue)) {
+            continue
+        }
+
+        try {
+            $version = & $candidate.Cmd @($candidate.Args + @("-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"))
+            $version = $version.Trim()
+
+            if ($version -match '^3\.(1[12])$') {
+                return $candidate
+            }
+        } catch {
+            continue
+        }
+    }
+
+    throw "No suitable Python found. Please install Python 3.11 or 3.12 (64-bit) and ensure 'py -3.12' or 'py -3.11' works."
+}
 
 Write-Host "=== Building Catalon-Guard Portable Bundle ===" -ForegroundColor Green
 
@@ -14,21 +43,16 @@ if (Test-Path $bundle) {
 
 New-Item -ItemType Directory -Path $bundle | Out-Null
 
-$pythonCmd = $null
-if (Get-Command py -ErrorAction SilentlyContinue) {
-    $pythonCmd = "py"
-} elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonCmd = "python"
-} else {
-    throw "Python is required on the build machine."
-}
-
-Write-Host "Using Python command: $pythonCmd"
-& $pythonCmd -m venv $runtime
+$python = Resolve-BuildPython
+Write-Host "Using Python launcher: $($python.Cmd) $($python.Args -join ' ')" -ForegroundColor Cyan
+& $python.Cmd @($python.Args + @("-m", "venv", $runtime))
 
 $pyExe = Join-Path $runtime "Scripts\python.exe"
-& $pyExe -m pip install --upgrade pip
-& $pyExe -m pip install "litellm[proxy]" requests
+& $pyExe -m pip install --upgrade pip setuptools wheel
+
+# Force binary wheels for orjson to avoid Rust toolchain/source builds.
+& $pyExe -m pip install --only-binary=:all: "orjson==3.10.16"
+& $pyExe -m pip install --prefer-binary --only-binary=orjson "litellm[proxy]" requests
 
 Copy-Item (Join-Path $root "config.yaml") (Join-Path $bundle "config.yaml")
 Copy-Item (Join-Path $root ".env.template") (Join-Path $bundle ".env.template")
@@ -37,7 +61,7 @@ Copy-Item (Join-Path $root "guard_stats.py") (Join-Path $bundle "guard_stats.py"
 
 $startBat = @"
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 cd /d %~dp0
 if not exist .env (
   copy .env.template .env >nul
@@ -69,6 +93,8 @@ for /f "tokens=1,* delims==" %%K in ("%line%") do (
   set "val=%%L"
 )
 if defined key set "%key%=%val%"
+set "key="
+set "val="
 goto :eof
 "@
 

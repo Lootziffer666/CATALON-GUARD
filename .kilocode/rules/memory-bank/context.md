@@ -16,6 +16,7 @@ The project now includes dedicated Windows scripts for dependency installation a
 - [x] Updated Linux run script to auto-load `.env` with `KEY=VALUE` compatibility
 - [x] Added portable Windows bundle builder: `catalon-guard/portable/build_portable.ps1`
 - [x] Documented portable distribution flow in README (no global dependencies on target machine)
+- [x] Hardened portable build script with Python 3.11/3.12 selection and binary-wheel install strategy for `orjson`
 
 ## Current Structure
 
@@ -45,3 +46,4 @@ Next likely steps for this project:
 | 2026-04-03 | Refined dashboard into a Pretext-inspired UI pass with calmer typography and improved scanability. |
 | 2026-04-04 | Added native Windows setup/start scripts and rewrote docs for Windows-first usage without WSL. |
 | 2026-04-04 | Added portable Windows bundle build script (`portable/build_portable.ps1`) and README instructions for no-global-dependency distribution. |
+| 2026-04-04 | Fixed portable build reliability for `orjson` wheel build failures by enforcing Python 3.11/3.12 and binary wheel installation. |

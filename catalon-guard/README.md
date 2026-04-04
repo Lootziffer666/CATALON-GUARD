@@ -22,6 +22,8 @@ notepad .env
 
 Ja, geht: Du kannst ein **portables Bundle** bauen, das eine lokale Runtime inkl. Dependencies enthält. Auf dem Zielrechner brauchst du dann weder WSL noch eine globale Python-Installation.
 
+> Build-Maschine: Python **3.11 oder 3.12 (64-bit)** empfohlen (verhindert `orjson` Build-Fehler).
+
 ```powershell
 cd catalon-guard\portable
 .\build_portable.ps1
