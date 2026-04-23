@@ -1,0 +1,11 @@
+-keep class com.catalon.guard.** { *; }
+-keep class com.google.auth.** { *; }
+-keep class com.google.api.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn com.google.auth.**
+-dontwarn com.google.api.**
+-dontwarn org.bouncycastle.**

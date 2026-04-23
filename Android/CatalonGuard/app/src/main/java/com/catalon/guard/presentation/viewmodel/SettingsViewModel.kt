@@ -1,0 +1,91 @@
+package com.catalon.guard.presentation.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.catalon.guard.data.local.db.dao.ProviderConfigDao
+import com.catalon.guard.data.local.prefs.EncryptedPrefsManager
+import com.catalon.guard.util.VertexAuthInterceptor
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val encryptedPrefs: EncryptedPrefsManager,
+    private val providerConfigDao: ProviderConfigDao,
+    private val vertexAuthInterceptor: VertexAuthInterceptor
+) : ViewModel() {
+
+    data class UiState(
+        val darkMode: Boolean = true,
+        val vertexAiStudioKey: String = "",
+        val serviceAccountJson: String = "",
+        val vertexProjectId: String = "",
+        val vertexLocation: String = "us-central1",
+        val wikiEndpoint: String = "",
+        val wikiToken: String = "",
+        val rpmBuffer: Int = 1
+    )
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    init {
+        _uiState.update { state ->
+            state.copy(
+                vertexAiStudioKey = encryptedPrefs.getApiKey("vertex_ai") ?: "",
+                serviceAccountJson = encryptedPrefs.getVertexServiceAccountJson() ?: "",
+                vertexProjectId = encryptedPrefs.getString("vertex_project_id") ?: "",
+                vertexLocation = encryptedPrefs.getString("vertex_location") ?: "us-central1",
+                wikiEndpoint = encryptedPrefs.getWikiEndpoint() ?: "",
+                wikiToken = encryptedPrefs.getWikiToken() ?: "",
+                rpmBuffer = encryptedPrefs.getString("rpm_buffer")?.toIntOrNull() ?: 1
+            )
+        }
+    }
+
+    fun setDarkMode(enabled: Boolean) = _uiState.update { it.copy(darkMode = enabled) }
+    fun setVertexAiStudioKey(key: String) = _uiState.update { it.copy(vertexAiStudioKey = key) }
+    fun setServiceAccountJson(json: String) = _uiState.update { it.copy(serviceAccountJson = json) }
+    fun setVertexProjectId(id: String) = _uiState.update { it.copy(vertexProjectId = id) }
+    fun setVertexLocation(loc: String) = _uiState.update { it.copy(vertexLocation = loc) }
+    fun setWikiEndpoint(url: String) = _uiState.update { it.copy(wikiEndpoint = url) }
+    fun setWikiToken(token: String) = _uiState.update { it.copy(wikiToken = token) }
+    fun setRpmBuffer(v: Int) = _uiState.update { it.copy(rpmBuffer = v) }
+
+    fun saveVertexSettings() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.vertexAiStudioKey.isNotBlank()) {
+                encryptedPrefs.storeApiKey("vertex_ai", state.vertexAiStudioKey)
+                encryptedPrefs.storeApiKey("gemini", state.vertexAiStudioKey)
+            }
+            if (state.serviceAccountJson.isNotBlank()) {
+                encryptedPrefs.storeVertexServiceAccountJson(state.serviceAccountJson)
+                vertexAuthInterceptor.invalidateToken()
+            }
+            if (state.vertexProjectId.isNotBlank()) {
+                encryptedPrefs.storeString("vertex_project_id", state.vertexProjectId)
+            }
+            encryptedPrefs.storeString("vertex_location", state.vertexLocation)
+
+            providerConfigDao.getById("vertex_ai")?.let { entity ->
+                providerConfigDao.update(entity.copy(
+                    enabled = true,
+                    vertexProjectId = state.vertexProjectId,
+                    vertexLocation = state.vertexLocation
+                ))
+            }
+        }
+    }
+
+    fun saveWikiSettings() {
+        val state = _uiState.value
+        if (state.wikiEndpoint.isNotBlank()) encryptedPrefs.storeWikiEndpoint(state.wikiEndpoint)
+        if (state.wikiToken.isNotBlank()) encryptedPrefs.storeWikiToken(state.wikiToken)
+    }
+}
