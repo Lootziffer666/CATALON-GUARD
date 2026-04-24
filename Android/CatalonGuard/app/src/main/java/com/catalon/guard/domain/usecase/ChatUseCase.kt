@@ -8,6 +8,7 @@ import com.catalon.guard.domain.model.ChatMessage
 import com.catalon.guard.domain.model.HandoffEvent
 import com.catalon.guard.util.HandoffManager
 import com.catalon.guard.util.RateLimitTracker
+import com.catalon.guard.util.SkillRouter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
@@ -22,7 +23,8 @@ class ChatUseCase @Inject constructor(
     private val handoffManager: HandoffManager,
     private val requestLogDao: RequestLogDao,
     private val conversationRepository: ConversationRepository,
-    private val memoryUseCase: MemoryUseCase
+    private val memoryUseCase: MemoryUseCase,
+    private val skillRouter: SkillRouter
 ) {
     sealed class ChatResult {
         data class Token(val text: String, val providerId: String) : ChatResult()
@@ -40,7 +42,9 @@ class ChatUseCase @Inject constructor(
         )
         val enrichedMessages = buildMessagesWithMemory(messages, memories)
 
-        val providers = rateLimitTracker.getRankedAvailableProviders().toMutableList()
+        val lastUserMsg = messages.lastOrNull { it.role == "user" }?.content ?: ""
+        val specialty = skillRouter.detectSpecialty(lastUserMsg)
+        val providers = rateLimitTracker.getRankedAvailableProviders(specialty).toMutableList()
         val triedIds = mutableSetOf<String>()
         val accumulated = StringBuilder()
         val startTime = System.currentTimeMillis()

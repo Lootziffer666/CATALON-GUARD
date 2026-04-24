@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -63,7 +65,7 @@ fun SettingsScreen(
                             onValueChange = { viewModel.setVertexAiStudioKey(it) }
                         )
 
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                         Text("Option B: Service Account JSON (Vertex AI proper)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                         OutlinedTextField(
                             value = state.serviceAccountJson,
@@ -132,6 +134,57 @@ fun SettingsScreen(
                 }
             }
 
+            item { SectionTitle("CATALON API (Local Proxy)") }
+            item {
+                val clipboardManager = LocalClipboardManager.current
+                Card {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Expose an OpenAI-compatible endpoint on this device. Use it in Cursor, Continue, or any LLM client — all providers are wrapped automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (state.isApiServerRunning) Icons.Default.Wifi else Icons.Default.WifiOff,
+                                null,
+                                tint = if (state.isApiServerRunning) MaterialTheme.colorScheme.secondary
+                                       else MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text("Enable API Server (port 4141)", modifier = Modifier.weight(1f))
+                            Switch(
+                                checked = state.isApiServerRunning,
+                                onCheckedChange = { on ->
+                                    if (on) viewModel.startApiServer() else viewModel.stopApiServer()
+                                }
+                            )
+                        }
+                        if (state.isApiServerRunning && state.localIpAddress.isNotEmpty()) {
+                            val endpoint = "http://${state.localIpAddress}:4141"
+                            OutlinedTextField(
+                                value = endpoint,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Base URL — paste into your tool") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { clipboardManager.setText(AnnotatedString(endpoint)) }) {
+                                        Icon(Icons.Default.ContentCopy, "Copy")
+                                    }
+                                }
+                            )
+                            Text(
+                                "API key: any non-empty string\nModel: any string (Catalon Guard routes automatically)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                }
+            }
+
             item { SectionTitle("About") }
             item {
                 Card {
@@ -139,7 +192,7 @@ fun SettingsScreen(
                         Text("Catalon Guard v1.0", fontWeight = FontWeight.Bold)
                         Text("Unified LLM Router with automatic handoff", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                         Spacer(Modifier.height(4.dp))
-                        Text("14 providers • ONNX Memory • Wiki Export", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        Text("21 providers • Skill Rotation • ONNX Memory • Wiki Export • Local Proxy", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                     }
                 }
             }

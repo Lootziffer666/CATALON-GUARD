@@ -64,6 +64,7 @@ class OnnxEmbeddingEngine @Inject constructor(
         )
 
         val results = sess.run(inputs)
+        @Suppress("UNCHECKED_CAST")
         val output = results[0].value as Array<Array<FloatArray>>
         meanPool(output[0], attentionMask)
     }

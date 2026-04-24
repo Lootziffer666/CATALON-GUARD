@@ -1,8 +1,10 @@
 package com.catalon.guard.util
 
+import com.catalon.guard.data.local.db.dao.ModelConfigDao
 import com.catalon.guard.data.local.db.dao.ProviderConfigDao
 import com.catalon.guard.data.local.db.dao.RequestLogDao
 import com.catalon.guard.data.local.db.entity.ProviderConfigEntity
+import com.catalon.guard.data.remote.provider.Specialty
 import kotlinx.coroutines.sync.Semaphore
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -10,20 +12,17 @@ import javax.inject.Singleton
 @Singleton
 class RateLimitTracker @Inject constructor(
     private val requestLogDao: RequestLogDao,
-    private val providerConfigDao: ProviderConfigDao
+    private val providerConfigDao: ProviderConfigDao,
+    private val modelConfigDao: ModelConfigDao
 ) {
-    // Z.AI has a concurrent request limit of 1
     private val zaiSemaphore = Semaphore(1)
 
     suspend fun canUse(provider: ProviderConfigEntity): Boolean {
         if (!provider.enabled) return false
 
         val now = System.currentTimeMillis()
-        val oneMinuteAgo = now - 60_000L
-        val oneDayAgo = now - 86_400_000L
-
-        val rpmCount = requestLogDao.countSince(provider.id, oneMinuteAgo)
-        val rpdCount = requestLogDao.countSince(provider.id, oneDayAgo)
+        val rpmCount = requestLogDao.countSince(provider.id, now - 60_000L)
+        val rpdCount = requestLogDao.countSince(provider.id, now - 86_400_000L)
 
         val effectiveRpm = if (provider.rpmLimit == Int.MAX_VALUE) Int.MAX_VALUE else provider.rpmLimit - 1
         val effectiveRpd = if (provider.rpdLimit == Int.MAX_VALUE) Int.MAX_VALUE else provider.rpdLimit - 5
@@ -31,10 +30,29 @@ class RateLimitTracker @Inject constructor(
         return rpmCount < effectiveRpm && rpdCount < effectiveRpd
     }
 
-    suspend fun getRankedAvailableProviders(): List<ProviderConfigEntity> =
-        providerConfigDao.getEnabledProviders()
-            .filter { canUse(it) }
-            .sortedWith(compareBy({ it.tier }, { it.rpmLimit.toLong() * -1 }))
+    suspend fun getRankedAvailableProviders(specialty: Specialty? = null): List<ProviderConfigEntity> {
+        val available = providerConfigDao.getEnabledProviders().filter { canUse(it) }
+        val sorter = compareBy<ProviderConfigEntity>({ it.tier }, { it.rpmLimit.toLong() * -1 })
+
+        if (specialty == null || specialty == Specialty.GENERAL) {
+            return available.sortedWith(sorter)
+        }
+
+        val specialtyStr = specialty.name
+        val preferred = mutableListOf<ProviderConfigEntity>()
+        val fallback = mutableListOf<ProviderConfigEntity>()
+
+        for (provider in available) {
+            val models = modelConfigDao.getByProvider(provider.id)
+            if (models.any { it.specialties.contains(specialtyStr) }) {
+                preferred.add(provider)
+            } else {
+                fallback.add(provider)
+            }
+        }
+
+        return preferred.sortedWith(sorter) + fallback.sortedWith(sorter)
+    }
 
     suspend fun getUsage(providerId: String): Pair<Int, Int> {
         val now = System.currentTimeMillis()

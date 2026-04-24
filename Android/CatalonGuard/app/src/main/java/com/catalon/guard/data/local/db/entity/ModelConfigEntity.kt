@@ -25,5 +25,6 @@ data class ModelConfigEntity(
     val rpmLimit: Int = Int.MAX_VALUE,
     val rpdLimit: Int = Int.MAX_VALUE,
     val supportsVision: Boolean = false,
-    val supportsReasoning: Boolean = false
+    val supportsReasoning: Boolean = false,
+    val specialties: String = "GENERAL"   // comma-separated Specialty names
 )
