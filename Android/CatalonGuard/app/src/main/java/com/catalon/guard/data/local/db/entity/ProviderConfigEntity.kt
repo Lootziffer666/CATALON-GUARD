@@ -21,5 +21,6 @@ data class ProviderConfigEntity(
     val vertexProjectId: String? = null,
     val vertexLocation: String? = null,
     val selectedModel: String,
-    val notes: String = ""
+    val notes: String = "",
+    val registrationUrl: String = ""
 )

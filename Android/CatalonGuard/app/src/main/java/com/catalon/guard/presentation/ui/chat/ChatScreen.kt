@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -280,7 +281,7 @@ private fun ChatInputBar(
                             else MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(48.dp)
         ) {
-            Icon(if (isStreaming) Icons.Default.HourglassEmpty else Icons.Default.Send, "Send")
+            Icon(if (isStreaming) Icons.Default.HourglassEmpty else Icons.AutoMirrored.Filled.Send, "Send")
         }
     }
 }

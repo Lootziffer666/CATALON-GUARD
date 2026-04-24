@@ -1,6 +1,7 @@
 package com.catalon.guard.presentation.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,7 +16,7 @@ import com.catalon.guard.presentation.ui.quota.QuotaDashboardScreen
 import com.catalon.guard.presentation.ui.settings.SettingsScreen
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Chat : Screen("chat", "Chat", Icons.Default.Chat)
+    object Chat : Screen("chat", "Chat", Icons.AutoMirrored.Filled.Chat)
     object Providers : Screen("providers", "Providers", Icons.Default.Tune)
     object Projects : Screen("projects", "Projects", Icons.Default.Folder)
     object Quota : Screen("quota", "Quota", Icons.Default.BarChart)

@@ -20,6 +20,7 @@ coroutines = "1.9.0"
 googleAuth = "1.23.0"
 coil = "2.7.0"
 coreKtx = "1.13.1"
+nanohttpd = "2.3.1"
 
 [libraries]
 # AndroidX Core
@@ -82,6 +83,9 @@ google-auth-library = { group = "com.google.auth", name = "google-auth-library-o
 
 # Coil (Image Loading)
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# NanoHTTPD (local API server)
+nanohttpd = { group = "org.nanohttpd", name = "nanohttpd", version.ref = "nanohttpd" }
 
 # Test
 junit = { group = "junit", name = "junit", version = "4.13.2" }

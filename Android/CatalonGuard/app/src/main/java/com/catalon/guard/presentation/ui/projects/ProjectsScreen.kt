@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -184,7 +185,7 @@ private fun SessionItem(
             .padding(start = (depth * 16 + 32).dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
+        Icon(Icons.AutoMirrored.Filled.Chat, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(session.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)

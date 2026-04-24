@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -102,6 +103,7 @@ private fun ProviderCard(
     var apiKeyText by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
     val entity = pw.entity
+    val uriHandler = LocalUriHandler.current
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -157,6 +159,13 @@ private fun ProviderCard(
                     color = MaterialTheme.colorScheme.outline
                 )
                 Spacer(Modifier.weight(1f))
+                if (!pw.hasApiKey && entity.registrationUrl.isNotEmpty()) {
+                    TextButton(onClick = { uriHandler.openUri(entity.registrationUrl) }) {
+                        Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Get Key", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
                 TextButton(onClick = { showKeyInput = !showKeyInput }) {
                     Text(if (showKeyInput) "Cancel" else "Set Key")
                 }

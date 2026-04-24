@@ -120,6 +120,9 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
+    // NanoHTTPD (local OpenAI-compatible API server)
+    implementation(libs.nanohttpd)
+
     // Test
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

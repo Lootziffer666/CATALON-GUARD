@@ -1,20 +1,27 @@
 package com.catalon.guard.presentation.viewmodel
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.catalon.guard.data.local.db.dao.ProviderConfigDao
 import com.catalon.guard.data.local.prefs.EncryptedPrefsManager
+import com.catalon.guard.util.CatalonApiService
 import com.catalon.guard.util.VertexAuthInterceptor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val encryptedPrefs: EncryptedPrefsManager,
     private val providerConfigDao: ProviderConfigDao,
     private val vertexAuthInterceptor: VertexAuthInterceptor
@@ -28,7 +35,9 @@ class SettingsViewModel @Inject constructor(
         val vertexLocation: String = "us-central1",
         val wikiEndpoint: String = "",
         val wikiToken: String = "",
-        val rpmBuffer: Int = 1
+        val rpmBuffer: Int = 1,
+        val isApiServerRunning: Boolean = false,
+        val localIpAddress: String = ""
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -87,5 +96,26 @@ class SettingsViewModel @Inject constructor(
         val state = _uiState.value
         if (state.wikiEndpoint.isNotBlank()) encryptedPrefs.storeWikiEndpoint(state.wikiEndpoint)
         if (state.wikiToken.isNotBlank()) encryptedPrefs.storeWikiToken(state.wikiToken)
+    }
+
+    fun startApiServer() {
+        context.startForegroundService(Intent(context, CatalonApiService::class.java))
+        _uiState.update { it.copy(isApiServerRunning = true, localIpAddress = getLocalIpAddress()) }
+    }
+
+    fun stopApiServer() {
+        context.stopService(Intent(context, CatalonApiService::class.java))
+        _uiState.update { it.copy(isApiServerRunning = false, localIpAddress = "") }
+    }
+
+    private fun getLocalIpAddress(): String {
+        return try {
+            NetworkInterface.getNetworkInterfaces()?.toList()
+                ?.flatMap { it.inetAddresses.toList() }
+                ?.firstOrNull { !it.isLoopbackAddress && it is Inet4Address }
+                ?.hostAddress ?: "unknown"
+        } catch (_: Exception) {
+            "unknown"
+        }
     }
 }
