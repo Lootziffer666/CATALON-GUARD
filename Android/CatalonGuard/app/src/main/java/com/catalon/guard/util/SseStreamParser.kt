@@ -12,19 +12,23 @@ import okhttp3.ResponseBody
 object SseStreamParser {
 
     fun parseStream(body: ResponseBody, gson: Gson): Flow<String> = flow {
-        val reader = body.charStream().buffered()
-        reader.use { br ->
-            br.forEachLine { line ->
-                if (!line.startsWith("data: ")) return@forEachLine
+        body.charStream().buffered().use { br ->
+            while (true) {
+                val line = br.readLine() ?: break
+                if (!line.startsWith("data: ")) continue
+
                 val data = line.removePrefix("data: ").trim()
-                if (data == "[DONE]") return@forEachLine
-                if (data.isBlank()) return@forEachLine
+                if (data == "[DONE]") continue
+                if (data.isBlank()) continue
+
                 try {
                     val chunk = gson.fromJson(data, StreamChunk::class.java)
                     val token = chunk?.choices?.firstOrNull()?.delta?.content
-                    if (token != null && token.isNotEmpty()) emit(token)
+                    if (!token.isNullOrEmpty()) {
+                        emit(token)
+                    }
                 } catch (_: JsonSyntaxException) {
-                    // Skip malformed lines (common with some providers)
+                    // Skip malformed lines
                 }
             }
         }
