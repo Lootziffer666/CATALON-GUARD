@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import java.nio.LongBuffer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -55,9 +56,9 @@ class OnnxEmbeddingEngine @Inject constructor(
         val tokenTypeIds = LongArray(inputIds.size) { 0L }
 
         val seqLen = inputIds.size.toLong()
-        val inputIdsTensor = OnnxTensor.createTensor(env, arrayOf(inputIds), longArrayOf(1, seqLen))
-        val attMaskTensor = OnnxTensor.createTensor(env, arrayOf(attentionMask), longArrayOf(1, seqLen))
-        val tokenTypeTensor = OnnxTensor.createTensor(env, arrayOf(tokenTypeIds), longArrayOf(1, seqLen))
+        val inputIdsTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(inputIds), longArrayOf(1, seqLen))
+        val attMaskTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(attentionMask), longArrayOf(1, seqLen))
+        val tokenTypeTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(tokenTypeIds), longArrayOf(1, seqLen))
 
         val inputs = mapOf(
             "input_ids" to inputIdsTensor,
