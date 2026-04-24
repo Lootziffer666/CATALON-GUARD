@@ -61,10 +61,6 @@ android {
         }
     }
 }
-            excludes += "META-INF/NOTICE.txt"
-        }
-    }
-}
 
 dependencies {
     // AndroidX Core
