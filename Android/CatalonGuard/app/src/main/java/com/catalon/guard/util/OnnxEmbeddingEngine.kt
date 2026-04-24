@@ -54,11 +54,9 @@ class OnnxEmbeddingEngine @Inject constructor(
         val attentionMask = LongArray(inputIds.size) { 1L }
         val tokenTypeIds = LongArray(inputIds.size) { 0L }
 
-        val seqLen = inputIds.size.toLong()
-        val inputIdsTensor = OnnxTensor.createTensor(env, arrayOf(inputIds), longArrayOf(1, seqLen))
-        val attMaskTensor = OnnxTensor.createTensor(env, arrayOf(attentionMask), longArrayOf(1, seqLen))
-        val tokenTypeTensor = OnnxTensor.createTensor(env, arrayOf(tokenTypeIds), longArrayOf(1, seqLen))
-
+        val inputIdsTensor = OnnxTensor.createTensor(env, arrayOf(inputIds))
+        val attMaskTensor = OnnxTensor.createTensor(env, arrayOf(attentionMask))
+        val tokenTypeTensor = OnnxTensor.createTensor(env, arrayOf(tokenTypeIds))
         val inputs = mapOf(
             "input_ids" to inputIdsTensor,
             "attention_mask" to attMaskTensor,
