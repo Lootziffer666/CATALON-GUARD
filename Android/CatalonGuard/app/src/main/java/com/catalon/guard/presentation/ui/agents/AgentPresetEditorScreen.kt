@@ -189,7 +189,6 @@ fun AgentPresetEditorScreen(
             if (!isBuiltIn) {
                 Button(
                     onClick = {
-                        val now = System.currentTimeMillis()
                         val updated = AgentPresetEntity(
                             id = preset?.id ?: "",
                             name = name.trim(),
@@ -200,11 +199,10 @@ fun AgentPresetEditorScreen(
                             functionSchemaJson = functionSchemaJson.trim().ifEmpty { null },
                             isPinned = preset?.isPinned ?: false,
                             isBuiltIn = false,
-                            createdAt = preset?.createdAt ?: now,
-                            updatedAt = now
+                            createdAt = preset?.createdAt ?: 0L,
+                            updatedAt = 0L
                         )
-                        viewModel.createOrUpdate(updated)
-                        if (state.jsonError == null) onBack()
+                        if (viewModel.createOrUpdate(updated)) onBack()
                     },
                     enabled = canSave,
                     modifier = Modifier.fillMaxWidth()

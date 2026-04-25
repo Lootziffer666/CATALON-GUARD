@@ -29,7 +29,6 @@ class CatalonApiServer @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun serve(session: IHTTPSession): Response {
-        // Bearer token auth — return 401 if missing or wrong
         val token = encryptedPrefs.getOrCreateLocalApiToken()
         val authHeader = session.headers["authorization"] ?: ""
         if (authHeader != "Bearer $token") {
@@ -63,15 +62,11 @@ class CatalonApiServer @Inject constructor(
                 ChatMessage(id = UUID.randomUUID().toString(), role = it.role, content = it.content)
             }
 
-            if (request.stream == true) {
-                streamResponse(messages)
-            } else {
-                blockingResponse(messages)
-            }
+            if (request.stream == true) streamResponse(messages) else blockingResponse(messages)
         } catch (e: Exception) {
             newFixedLengthResponse(
                 Response.Status.INTERNAL_ERROR, "application/json",
-                """{"error":{"message":"${e.message?.replace("\"", "'")}","type":"internal_error"}}"""
+                gson.toJson(mapOf("error" to mapOf("message" to e.message, "type" to "internal_error")))
             )
         }
     }
@@ -106,8 +101,10 @@ class CatalonApiServer @Inject constructor(
                             writer.flush()
                         }
                         is ChatUseCase.ChatResult.Error -> {
-                            val errJson = """{"error":{"message":"${result.message.replace("\"", "'")}","type":"provider_error"}}"""
-                            writer.write("data: $errJson\n\n")
+                            val payload = gson.toJson(
+                                mapOf("error" to mapOf("message" to result.message, "type" to "provider_error"))
+                            )
+                            writer.write("data: $payload\n\n")
                             writer.flush()
                         }
                         else -> {}
@@ -138,16 +135,35 @@ class CatalonApiServer @Inject constructor(
             }
         }
 
-        val content = accumulated.toString()
-            .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")
-        val json = """{"id":"catg-${System.currentTimeMillis()}","object":"chat.completion","model":"$modelId","choices":[{"index":0,"message":{"role":"assistant","content":"$content"},"finish_reason":"stop"}],"usage":{"prompt_tokens":0,"completion_tokens":${accumulated.length / 4},"total_tokens":${accumulated.length / 4}}}"""
+        val json = gson.toJson(mapOf(
+            "id" to "catg-${System.currentTimeMillis()}",
+            "object" to "chat.completion",
+            "model" to modelId,
+            "choices" to listOf(mapOf(
+                "index" to 0,
+                "message" to mapOf("role" to "assistant", "content" to accumulated.toString()),
+                "finish_reason" to "stop"
+            )),
+            "usage" to mapOf(
+                "prompt_tokens" to 0,
+                "completion_tokens" to (accumulated.length / 4),
+                "total_tokens" to (accumulated.length / 4)
+            )
+        ))
         return newFixedLengthResponse(Response.Status.OK, "application/json", json)
     }
 
     private fun buildSseChunk(token: String): String {
-        val escaped = token.replace("\\", "\\\\").replace("\"", "\\\"")
-            .replace("\n", "\\n").replace("\r", "")
-        return "data: {\"id\":\"catg\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"content\":\"$escaped\"},\"index\":0,\"finish_reason\":null}]}\n\n"
+        val payload = gson.toJson(mapOf(
+            "id" to "catg",
+            "object" to "chat.completion.chunk",
+            "choices" to listOf(mapOf(
+                "delta" to mapOf("content" to token),
+                "index" to 0,
+                "finish_reason" to null
+            ))
+        ))
+        return "data: $payload\n\n"
     }
 
     fun startServer() {
@@ -156,7 +172,7 @@ class CatalonApiServer @Inject constructor(
 
     fun stopServer() {
         if (isAlive) stop()
-        scope.coroutineContext.cancelChildren()
+        scope.cancel()
     }
 
     data class OpenAiRequest(

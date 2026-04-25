@@ -45,19 +45,11 @@ class ChatViewModel @Inject constructor(
     private var activeSessionId: String = ""
 
     init {
-        viewModelScope.launch {
-            providerConfigDao.observeAll()
-                .map { all -> all.filter { it.enabled } }
-                .collect { enabled ->
-                    _uiState.update { it.copy(availableProviders = enabled) }
-
-                    if (activeSessionId.isEmpty() && enabled.isNotEmpty()) {
-                        val provider = enabled.firstOrNull { it.id == _uiState.value.selectedProviderId }
-                            ?: enabled.first()
-                        createSession(provider)
-                    }
-                }
-        }
+        // Keep availableProviders in sync; session creation is deferred to first user action.
+        providerConfigDao.observeAll()
+            .map { all -> all.filter { it.enabled } }
+            .onEach { enabled -> _uiState.update { it.copy(availableProviders = enabled) } }
+            .launchIn(viewModelScope)
     }
 
     private suspend fun createSession(
@@ -87,13 +79,17 @@ class ChatViewModel @Inject constructor(
         else providers.first()
     }
 
+    private fun requireProviders(): List<ProviderConfigEntity>? {
+        val providers = _uiState.value.availableProviders
+        return if (providers.isEmpty()) {
+            _uiState.update { it.copy(error = "Keine Provider verfügbar. Bitte API-Keys hinterlegen.") }
+            null
+        } else providers
+    }
+
     fun startPresetChat(preset: AgentPresetEntity) {
         viewModelScope.launch {
-            val providers = _uiState.value.availableProviders
-            if (providers.isEmpty()) {
-                _uiState.update { it.copy(error = "Keine Provider verfügbar. Bitte API-Keys hinterlegen.") }
-                return@launch
-            }
+            requireProviders() ?: return@launch
             val provider = resolveProvider(preset.defaultProviderId)
             val model = preset.defaultModelId ?: provider.selectedModel
             activeSessionId = conversationRepository.createSession(
@@ -143,14 +139,8 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             if (activeSessionId.isEmpty()) {
-                val providers = _uiState.value.availableProviders
-                if (providers.isEmpty()) {
-                    _uiState.update { it.copy(error = "Keine Provider konfiguriert. Bitte API-Keys in Providers hinterlegen.") }
-                    return@launch
-                }
-                val provider = providers.firstOrNull { it.id == _uiState.value.selectedProviderId }
-                    ?: providers.first()
-                createSession(provider)
+                requireProviders() ?: return@launch
+                createSession(resolveProvider(_uiState.value.selectedProviderId.ifEmpty { null }))
             }
 
             val userMsg = ChatMessage(
@@ -223,14 +213,8 @@ class ChatViewModel @Inject constructor(
 
     fun newSession() {
         viewModelScope.launch {
-            val providers = _uiState.value.availableProviders
-            if (providers.isEmpty()) {
-                _uiState.update { it.copy(error = "Keine Provider verfügbar. Bitte API-Keys hinterlegen.") }
-                return@launch
-            }
-            val provider = providers.firstOrNull { it.id == _uiState.value.selectedProviderId }
-                ?: providers.first()
-            createSession(provider)
+            val providers = requireProviders() ?: return@launch
+            createSession(resolveProvider(_uiState.value.selectedProviderId.ifEmpty { null }))
             _uiState.update {
                 it.copy(
                     messages = emptyList(),

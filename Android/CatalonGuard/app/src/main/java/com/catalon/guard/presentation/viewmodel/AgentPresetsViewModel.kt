@@ -20,8 +20,6 @@ class AgentPresetsViewModel @Inject constructor(
 
     data class UiState(
         val presets: List<AgentPresetEntity> = emptyList(),
-        val editingPreset: AgentPresetEntity? = null,
-        val showEditor: Boolean = false,
         val jsonError: String? = null
     )
 
@@ -29,31 +27,27 @@ class AgentPresetsViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repository.observeAll().collect { presets ->
-                _uiState.update { it.copy(presets = presets) }
-            }
-        }
+        repository.observeAll()
+            .onEach { presets -> _uiState.update { it.copy(presets = presets) } }
+            .launchIn(viewModelScope)
     }
 
-    fun openEditor(preset: AgentPresetEntity?) {
-        _uiState.update { it.copy(editingPreset = preset, showEditor = true, jsonError = null) }
-    }
+    /** Returns true when validation passed and the save was launched; false when validation failed. */
+    fun createOrUpdate(preset: AgentPresetEntity): Boolean {
+        // Guard: built-in presets cannot be overwritten from outside seeding
+        if (_uiState.value.presets.any { it.id == preset.id && it.isBuiltIn }) return false
 
-    fun closeEditor() {
-        _uiState.update { it.copy(editingPreset = null, showEditor = false, jsonError = null) }
-    }
-
-    fun createOrUpdate(preset: AgentPresetEntity) {
         val schemaJson = preset.functionSchemaJson
         if (!schemaJson.isNullOrBlank()) {
             try {
                 gson.fromJson(schemaJson, JsonObject::class.java)
             } catch (e: Exception) {
                 _uiState.update { it.copy(jsonError = "Invalid JSON: ${e.message}") }
-                return
+                return false
             }
         }
+        _uiState.update { it.copy(jsonError = null) }
+
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val toSave = if (preset.id.isEmpty())
@@ -61,8 +55,8 @@ class AgentPresetsViewModel @Inject constructor(
             else
                 preset.copy(updatedAt = now)
             repository.save(toSave)
-            closeEditor()
         }
+        return true
     }
 
     fun delete(preset: AgentPresetEntity) {
