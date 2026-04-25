@@ -35,7 +35,9 @@ class ConversationRepository @Inject constructor(
     suspend fun createSession(
         projectId: String?,
         providerId: String,
-        modelId: String
+        modelId: String,
+        presetId: String? = null,
+        systemPrompt: String = ""
     ): String {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
@@ -47,7 +49,9 @@ class ConversationRepository @Inject constructor(
                 createdAt = now,
                 updatedAt = now,
                 currentProviderId = providerId,
-                currentModelId = modelId
+                currentModelId = modelId,
+                systemPrompt = systemPrompt,
+                presetId = presetId
             )
         )
         return id

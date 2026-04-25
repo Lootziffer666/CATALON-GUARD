@@ -3,6 +3,7 @@ package com.catalon.guard.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.catalon.guard.data.local.db.dao.ProviderConfigDao
+import com.catalon.guard.data.local.db.entity.AgentPresetEntity
 import com.catalon.guard.data.local.db.entity.ProviderConfigEntity
 import com.catalon.guard.data.repository.ConversationRepository
 import com.catalon.guard.domain.model.ChatMessage
@@ -30,11 +31,12 @@ class ChatViewModel @Inject constructor(
         val handoffToast: HandoffEvent? = null,
         val error: String? = null,
         val inputText: String = "",
-        // Provider picker
         val availableProviders: List<ProviderConfigEntity> = emptyList(),
         val selectedProviderId: String = "",
         val selectedProviderName: String = "",
-        val showProviderPicker: Boolean = false
+        val showProviderPicker: Boolean = false,
+        val activePresetId: String? = null,
+        val activePresetName: String? = null
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -43,14 +45,12 @@ class ChatViewModel @Inject constructor(
     private var activeSessionId: String = ""
 
     init {
-        // Observe providers so we react even when DB seeding finishes after ViewModel creation
         viewModelScope.launch {
             providerConfigDao.observeAll()
                 .map { all -> all.filter { it.enabled } }
                 .collect { enabled ->
                     _uiState.update { it.copy(availableProviders = enabled) }
 
-                    // Auto-create initial session once providers are available
                     if (activeSessionId.isEmpty() && enabled.isNotEmpty()) {
                         val provider = enabled.firstOrNull { it.id == _uiState.value.selectedProviderId }
                             ?: enabled.first()
@@ -60,11 +60,17 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun createSession(provider: ProviderConfigEntity) {
+    private suspend fun createSession(
+        provider: ProviderConfigEntity,
+        presetId: String? = null,
+        systemPrompt: String = ""
+    ) {
         activeSessionId = conversationRepository.createSession(
             projectId = null,
             providerId = provider.id,
-            modelId = provider.selectedModel
+            modelId = provider.selectedModel,
+            presetId = presetId,
+            systemPrompt = systemPrompt
         )
         _uiState.update {
             it.copy(
@@ -72,6 +78,44 @@ class ChatViewModel @Inject constructor(
                 selectedProviderId = provider.id,
                 selectedProviderName = provider.name
             )
+        }
+    }
+
+    private fun resolveProvider(preferredId: String?): ProviderConfigEntity {
+        val providers = _uiState.value.availableProviders
+        return if (preferredId != null) providers.firstOrNull { it.id == preferredId } ?: providers.first()
+        else providers.first()
+    }
+
+    fun startPresetChat(preset: AgentPresetEntity) {
+        viewModelScope.launch {
+            val providers = _uiState.value.availableProviders
+            if (providers.isEmpty()) {
+                _uiState.update { it.copy(error = "Keine Provider verfügbar. Bitte API-Keys hinterlegen.") }
+                return@launch
+            }
+            val provider = resolveProvider(preset.defaultProviderId)
+            val model = preset.defaultModelId ?: provider.selectedModel
+            activeSessionId = conversationRepository.createSession(
+                projectId = null,
+                providerId = provider.id,
+                modelId = model,
+                presetId = preset.id,
+                systemPrompt = preset.systemPrompt
+            )
+            _uiState.update {
+                it.copy(
+                    messages = emptyList(),
+                    streamingText = "",
+                    isStreaming = false,
+                    error = null,
+                    activePresetId = preset.id,
+                    activePresetName = preset.name,
+                    selectedProviderId = provider.id,
+                    selectedProviderName = provider.name,
+                    sessionId = activeSessionId
+                )
+            }
         }
     }
 
@@ -192,7 +236,9 @@ class ChatViewModel @Inject constructor(
                     messages = emptyList(),
                     streamingText = "",
                     isStreaming = false,
-                    error = null
+                    error = null,
+                    activePresetId = null,
+                    activePresetName = null
                 )
             }
         }

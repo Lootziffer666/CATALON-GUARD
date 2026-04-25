@@ -1,5 +1,9 @@
 package com.catalon.guard.util
 
+import com.catalon.guard.data.local.db.DatabaseInitializer
+import com.catalon.guard.data.local.db.dao.ProviderConfigDao
+import com.catalon.guard.data.local.prefs.EncryptedPrefsManager
+import com.catalon.guard.data.repository.ConversationRepository
 import com.catalon.guard.domain.model.ChatMessage
 import com.catalon.guard.domain.usecase.ChatUseCase
 import com.google.gson.Gson
@@ -15,18 +19,34 @@ import javax.inject.Singleton
 @Singleton
 class CatalonApiServer @Inject constructor(
     private val chatUseCase: ChatUseCase,
+    private val conversationRepository: ConversationRepository,
+    private val providerConfigDao: ProviderConfigDao,
+    private val databaseInitializer: DatabaseInitializer,
+    private val encryptedPrefs: EncryptedPrefsManager,
     private val gson: Gson
-) : NanoHTTPD(4141) {
+) : NanoHTTPD("127.0.0.1", 4141) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun serve(session: IHTTPSession): Response {
+        // Bearer token auth — return 401 if missing or wrong
+        val token = encryptedPrefs.getOrCreateLocalApiToken()
+        val authHeader = session.headers["authorization"] ?: ""
+        if (authHeader != "Bearer $token") {
+            return newFixedLengthResponse(
+                Response.Status.UNAUTHORIZED, "application/json",
+                """{"error":{"message":"Unauthorized","type":"auth_error"}}"""
+            )
+        }
+
         if (session.method != Method.POST) {
             return newFixedLengthResponse(Response.Status.METHOD_NOT_ALLOWED, MIME_PLAINTEXT, "")
         }
         if (session.uri != "/v1/chat/completions") {
-            return newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json",
-                """{"error":{"message":"Only POST /v1/chat/completions is supported","type":"not_found"}}""")
+            return newFixedLengthResponse(
+                Response.Status.NOT_FOUND, "application/json",
+                """{"error":{"message":"Only POST /v1/chat/completions is supported","type":"not_found"}}"""
+            )
         }
 
         return try {
@@ -34,32 +54,47 @@ class CatalonApiServer @Inject constructor(
             session.parseBody(body)
             val postData = body["postData"] ?: body["content"] ?: ""
             val request = gson.fromJson(postData, OpenAiRequest::class.java)
-                ?: return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json",
-                    """{"error":{"message":"Invalid JSON body","type":"bad_request"}}""")
+                ?: return newFixedLengthResponse(
+                    Response.Status.BAD_REQUEST, "application/json",
+                    """{"error":{"message":"Invalid JSON body","type":"bad_request"}}"""
+                )
 
             val messages = request.messages.map {
                 ChatMessage(id = UUID.randomUUID().toString(), role = it.role, content = it.content)
             }
-            val sessionId = "api_${System.currentTimeMillis()}"
 
             if (request.stream == true) {
-                streamResponse(messages, sessionId)
+                streamResponse(messages)
             } else {
-                blockingResponse(messages, sessionId)
+                blockingResponse(messages)
             }
         } catch (e: Exception) {
-            newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json",
-                """{"error":{"message":"${e.message?.replace("\"", "'")}","type":"internal_error"}}""")
+            newFixedLengthResponse(
+                Response.Status.INTERNAL_ERROR, "application/json",
+                """{"error":{"message":"${e.message?.replace("\"", "'")}","type":"internal_error"}}"""
+            )
         }
     }
 
-    private fun streamResponse(messages: List<ChatMessage>, sessionId: String): Response {
+    private suspend fun resolveSessionId(): String {
+        databaseInitializer.ready.await()
+        val provider = providerConfigDao.getEnabledProviders().firstOrNull()
+            ?: throw IllegalStateException("No enabled provider")
+        return conversationRepository.createSession(
+            projectId = null,
+            providerId = provider.id,
+            modelId = provider.selectedModel
+        )
+    }
+
+    private fun streamResponse(messages: List<ChatMessage>): Response {
         val pipeOut = PipedOutputStream()
         val pipeIn = PipedInputStream(pipeOut, 8192)
         val writer = pipeOut.bufferedWriter()
 
         scope.launch {
             try {
+                val sessionId = resolveSessionId()
                 chatUseCase.chat(messages, sessionId).collect { result ->
                     when (result) {
                         is ChatUseCase.ChatResult.Token -> {
@@ -86,11 +121,12 @@ class CatalonApiServer @Inject constructor(
         return newChunkedResponse(Response.Status.OK, "text/event-stream", pipeIn)
     }
 
-    private fun blockingResponse(messages: List<ChatMessage>, sessionId: String): Response {
+    private fun blockingResponse(messages: List<ChatMessage>): Response {
         val accumulated = StringBuilder()
         var modelId = "catalon-guard"
 
         runBlocking {
+            val sessionId = resolveSessionId()
             chatUseCase.chat(messages, sessionId).collect { result ->
                 when (result) {
                     is ChatUseCase.ChatResult.Token -> {

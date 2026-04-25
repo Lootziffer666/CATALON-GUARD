@@ -1,5 +1,6 @@
 package com.catalon.guard.domain.usecase
 
+import com.catalon.guard.data.local.db.dao.ConversationSessionDao
 import com.catalon.guard.data.local.db.dao.RequestLogDao
 import com.catalon.guard.data.local.db.entity.RequestLogEntity
 import com.catalon.guard.data.repository.ConversationRepository
@@ -23,6 +24,7 @@ class ChatUseCase @Inject constructor(
     private val handoffManager: HandoffManager,
     private val requestLogDao: RequestLogDao,
     private val conversationRepository: ConversationRepository,
+    private val conversationSessionDao: ConversationSessionDao,
     private val memoryUseCase: MemoryUseCase,
     private val skillRouter: SkillRouter
 ) {
@@ -36,12 +38,18 @@ class ChatUseCase @Inject constructor(
     fun chat(
         messages: List<ChatMessage>,
         sessionId: String,
-        preferredProviderId: String? = null
+        preferredProviderId: String? = null,
+        preferredModelId: String? = null
     ): Flow<ChatResult> = flow {
         val memories = memoryUseCase.retrieveRelevant(
             messages.lastOrNull { it.role == "user" }?.content ?: "", sessionId
         )
-        val enrichedMessages = buildMessagesWithMemory(messages, memories)
+
+        // Inject system prompt from session (set by preset, invisible in UI)
+        val sessionSystemPrompt = conversationSessionDao.getById(sessionId)?.systemPrompt
+            ?.takeIf { it.isNotBlank() }
+
+        val enrichedMessages = buildMessages(messages, memories, sessionSystemPrompt)
 
         val lastUserMsg = messages.lastOrNull { it.role == "user" }?.content ?: ""
         val specialty = skillRouter.detectSpecialty(lastUserMsg)
@@ -52,7 +60,12 @@ class ChatUseCase @Inject constructor(
             val preferred = providers.find { it.id == preferredProviderId }
             if (preferred != null) {
                 providers.remove(preferred)
-                providers.add(0, preferred)
+                // Temporarily override model if a preferred model was requested
+                val resolved = if (preferredModelId != null)
+                    preferred.copy(selectedModel = preferredModelId)
+                else
+                    preferred
+                providers.add(0, resolved)
             }
         }
 
@@ -172,17 +185,23 @@ class ChatUseCase @Inject constructor(
         emit(ChatResult.Error("All providers exhausted. Check API keys and rate limits."))
     }
 
-    private fun buildMessagesWithMemory(
+    private fun buildMessages(
         messages: List<ChatMessage>,
-        memories: List<String>
+        memories: List<String>,
+        systemPrompt: String?
     ): List<ChatMessage> {
-        if (memories.isEmpty()) return messages
-        val memoryContext = memories.joinToString("\n\n") { "Memory: $it" }
-        val systemMsg = ChatMessage(
-            id = "memory_context",
-            role = "system",
-            content = "Relevant context from previous conversations:\n\n$memoryContext"
-        )
-        return listOf(systemMsg) + messages
+        val parts = mutableListOf<ChatMessage>()
+        if (!systemPrompt.isNullOrBlank()) {
+            parts += ChatMessage(id = "sys_preset", role = "system", content = systemPrompt)
+        }
+        if (memories.isNotEmpty()) {
+            val memCtx = memories.joinToString("\n\n") { "Memory: $it" }
+            parts += ChatMessage(
+                id = "sys_memory", role = "system",
+                content = "Relevant context from previous conversations:\n\n$memCtx"
+            )
+        }
+        parts += messages
+        return parts
     }
 }

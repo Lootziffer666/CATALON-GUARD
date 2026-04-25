@@ -24,5 +24,6 @@ data class ConversationSessionEntity(
     val currentProviderId: String,
     val currentModelId: String,
     val handoffCount: Int = 0,
-    val systemPrompt: String = ""
+    val systemPrompt: String = "",
+    val presetId: String? = null
 )

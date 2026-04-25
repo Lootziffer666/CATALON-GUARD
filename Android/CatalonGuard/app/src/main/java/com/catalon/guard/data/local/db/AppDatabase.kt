@@ -16,9 +16,10 @@ import com.catalon.guard.data.local.db.entity.*
         ConversationSessionEntity::class,
         ConversationMessageEntity::class,
         MemoryChunkEntity::class,
-        HandoffLogEntity::class
+        HandoffLogEntity::class,
+        AgentPresetEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,12 +31,36 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationMessageDao(): ConversationMessageDao
     abstract fun memoryChunkDao(): MemoryChunkDao
     abstract fun handoffLogDao(): HandoffLogDao
+    abstract fun agentPresetDao(): AgentPresetDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE provider_configs ADD COLUMN registrationUrl TEXT NOT NULL DEFAULT ''")
                 database.execSQL("ALTER TABLE model_configs ADD COLUMN specialties TEXT NOT NULL DEFAULT 'GENERAL'")
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS agent_presets (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        description TEXT NOT NULL DEFAULT '',
+                        systemPrompt TEXT NOT NULL DEFAULT '',
+                        defaultProviderId TEXT,
+                        defaultModelId TEXT,
+                        enabledToolIdsJson TEXT NOT NULL DEFAULT '[]',
+                        fileScopeIdsJson TEXT NOT NULL DEFAULT '[]',
+                        functionSchemaJson TEXT,
+                        isPinned INTEGER NOT NULL DEFAULT 0,
+                        isBuiltIn INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("ALTER TABLE conversation_sessions ADD COLUMN presetId TEXT")
             }
         }
     }
