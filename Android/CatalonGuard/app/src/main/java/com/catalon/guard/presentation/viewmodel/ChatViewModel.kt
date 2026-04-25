@@ -3,6 +3,7 @@ package com.catalon.guard.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.catalon.guard.data.local.db.dao.ProviderConfigDao
+import com.catalon.guard.data.local.db.entity.ProviderConfigEntity
 import com.catalon.guard.data.repository.ConversationRepository
 import com.catalon.guard.domain.model.ChatMessage
 import com.catalon.guard.domain.model.HandoffEvent
@@ -28,7 +29,12 @@ class ChatViewModel @Inject constructor(
         val sessionId: String = "",
         val handoffToast: HandoffEvent? = null,
         val error: String? = null,
-        val inputText: String = ""
+        val inputText: String = "",
+        // Provider picker
+        val availableProviders: List<ProviderConfigEntity> = emptyList(),
+        val selectedProviderId: String = "",
+        val selectedProviderName: String = "",
+        val showProviderPicker: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -37,22 +43,54 @@ class ChatViewModel @Inject constructor(
     private var activeSessionId: String = ""
 
     init {
+        // Observe providers so we react even when DB seeding finishes after ViewModel creation
         viewModelScope.launch {
-            val providers = providerConfigDao.getEnabledProviders()
-            val defaultProvider = providers.firstOrNull()
-            if (defaultProvider != null) {
-                activeSessionId = conversationRepository.createSession(
-                    projectId = null,
-                    providerId = defaultProvider.id,
-                    modelId = defaultProvider.selectedModel
-                )
-                _uiState.update { it.copy(sessionId = activeSessionId) }
-            }
+            providerConfigDao.observeAll()
+                .map { all -> all.filter { it.enabled } }
+                .collect { enabled ->
+                    _uiState.update { it.copy(availableProviders = enabled) }
+
+                    // Auto-create initial session once providers are available
+                    if (activeSessionId.isEmpty() && enabled.isNotEmpty()) {
+                        val provider = enabled.firstOrNull { it.id == _uiState.value.selectedProviderId }
+                            ?: enabled.first()
+                        createSession(provider)
+                    }
+                }
+        }
+    }
+
+    private suspend fun createSession(provider: ProviderConfigEntity) {
+        activeSessionId = conversationRepository.createSession(
+            projectId = null,
+            providerId = provider.id,
+            modelId = provider.selectedModel
+        )
+        _uiState.update {
+            it.copy(
+                sessionId = activeSessionId,
+                selectedProviderId = provider.id,
+                selectedProviderName = provider.name
+            )
         }
     }
 
     fun onInputChanged(text: String) {
         _uiState.update { it.copy(inputText = text) }
+    }
+
+    fun selectProvider(provider: ProviderConfigEntity) {
+        _uiState.update {
+            it.copy(
+                selectedProviderId = provider.id,
+                selectedProviderName = provider.name,
+                showProviderPicker = false
+            )
+        }
+    }
+
+    fun toggleProviderPicker() {
+        _uiState.update { it.copy(showProviderPicker = !it.showProviderPicker) }
     }
 
     fun sendMessage() {
@@ -61,8 +99,14 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             if (activeSessionId.isEmpty()) {
-                _uiState.update { it.copy(error = "No provider configured. Please add API keys in Settings.") }
-                return@launch
+                val providers = _uiState.value.availableProviders
+                if (providers.isEmpty()) {
+                    _uiState.update { it.copy(error = "Keine Provider konfiguriert. Bitte API-Keys in Providers hinterlegen.") }
+                    return@launch
+                }
+                val provider = providers.firstOrNull { it.id == _uiState.value.selectedProviderId }
+                    ?: providers.first()
+                createSession(provider)
             }
 
             val userMsg = ChatMessage(
@@ -74,22 +118,31 @@ class ChatViewModel @Inject constructor(
             conversationRepository.saveMessage(activeSessionId, "user", text)
             val allMessages = _uiState.value.messages + userMsg
 
-            _uiState.update { it.copy(
-                messages = allMessages,
-                inputText = "",
-                isStreaming = true,
-                streamingText = "",
-                handoffToast = null,
-                error = null
-            )}
+            _uiState.update {
+                it.copy(
+                    messages = allMessages,
+                    inputText = "",
+                    isStreaming = true,
+                    streamingText = "",
+                    handoffToast = null,
+                    error = null
+                )
+            }
 
-            chatUseCase.chat(allMessages, activeSessionId).collect { result ->
+            val preferredId = _uiState.value.selectedProviderId.ifEmpty { null }
+            chatUseCase.chat(allMessages, activeSessionId, preferredId).collect { result ->
                 when (result) {
                     is ChatUseCase.ChatResult.Token ->
-                        _uiState.update { it.copy(
-                            streamingText = it.streamingText + result.text,
-                            currentProviderId = result.providerId
-                        )}
+                        _uiState.update {
+                            it.copy(
+                                streamingText = it.streamingText + result.text,
+                                currentProviderId = result.providerId,
+                                selectedProviderId = result.providerId,
+                                selectedProviderName = it.availableProviders
+                                    .find { p -> p.id == result.providerId }?.name
+                                    ?: result.providerId
+                            )
+                        }
 
                     is ChatUseCase.ChatResult.Handoff ->
                         _uiState.update { it.copy(handoffToast = result.event) }
@@ -102,43 +155,49 @@ class ChatViewModel @Inject constructor(
                             timestamp = System.currentTimeMillis(),
                             providerId = result.providerId
                         )
-                        _uiState.update { it.copy(
-                            messages = it.messages + assistantMsg,
-                            streamingText = "",
-                            isStreaming = false
-                        )}
+                        _uiState.update {
+                            it.copy(
+                                messages = it.messages + assistantMsg,
+                                streamingText = "",
+                                isStreaming = false
+                            )
+                        }
                     }
 
                     is ChatUseCase.ChatResult.Error ->
-                        _uiState.update { it.copy(
-                            isStreaming = false,
-                            streamingText = "",
-                            error = result.message
-                        )}
+                        _uiState.update {
+                            it.copy(
+                                isStreaming = false,
+                                streamingText = "",
+                                error = result.message
+                            )
+                        }
                 }
+            }
+        }
+    }
+
+    fun newSession() {
+        viewModelScope.launch {
+            val providers = _uiState.value.availableProviders
+            if (providers.isEmpty()) {
+                _uiState.update { it.copy(error = "Keine Provider verfügbar. Bitte API-Keys hinterlegen.") }
+                return@launch
+            }
+            val provider = providers.firstOrNull { it.id == _uiState.value.selectedProviderId }
+                ?: providers.first()
+            createSession(provider)
+            _uiState.update {
+                it.copy(
+                    messages = emptyList(),
+                    streamingText = "",
+                    isStreaming = false,
+                    error = null
+                )
             }
         }
     }
 
     fun dismissHandoffToast() = _uiState.update { it.copy(handoffToast = null) }
     fun dismissError() = _uiState.update { it.copy(error = null) }
-
-    fun newSession() {
-        viewModelScope.launch {
-            val providers = providerConfigDao.getEnabledProviders()
-            val provider = providers.firstOrNull() ?: return@launch
-            activeSessionId = conversationRepository.createSession(
-                projectId = null,
-                providerId = provider.id,
-                modelId = provider.selectedModel
-            )
-            _uiState.update { it.copy(
-                messages = emptyList(),
-                streamingText = "",
-                isStreaming = false,
-                sessionId = activeSessionId,
-                error = null
-            )}
-        }
-    }
 }

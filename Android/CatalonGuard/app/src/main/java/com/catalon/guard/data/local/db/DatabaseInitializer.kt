@@ -40,7 +40,8 @@ class DatabaseInitializer @Inject constructor(
                 enabled = !default.isByok,
                 authType = default.authType,
                 selectedModel = default.models.firstOrNull()?.modelId ?: "",
-                notes = default.notes
+                notes = default.notes,
+                registrationUrl = default.registrationUrl
             )
         }
         providerConfigDao.upsertAll(providerEntities)

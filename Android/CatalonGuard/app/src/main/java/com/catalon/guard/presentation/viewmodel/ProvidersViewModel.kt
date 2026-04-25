@@ -7,7 +7,6 @@ import com.catalon.guard.data.local.db.dao.ModelConfigDao
 import com.catalon.guard.data.local.db.entity.ProviderConfigEntity
 import com.catalon.guard.data.local.db.entity.ModelConfigEntity
 import com.catalon.guard.data.local.prefs.EncryptedPrefsManager
-import com.catalon.guard.domain.model.Provider
 import com.catalon.guard.util.RateLimitTracker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -39,20 +38,27 @@ class ProvidersViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    // Bumped whenever a key is saved/removed so the flow re-reads encrypted prefs
+    private val _keyVersion = MutableStateFlow(0)
+
     init {
         viewModelScope.launch {
-            providerConfigDao.observeAll().collect { entities ->
-                val withUsage = entities.map { entity ->
-                    val (rpm, rpd) = rateLimitTracker.getUsage(entity.id)
-                    ProviderWithUsage(
-                        entity = entity,
-                        rpmUsed = rpm,
-                        rpdUsed = rpd,
-                        hasApiKey = encryptedPrefs.getApiKey(entity.id) != null
-                    )
+            combine(
+                providerConfigDao.observeAll(),
+                _keyVersion
+            ) { entities, _ -> entities }
+                .collect { entities ->
+                    val withUsage = entities.map { entity ->
+                        val (rpm, rpd) = rateLimitTracker.getUsage(entity.id)
+                        ProviderWithUsage(
+                            entity = entity,
+                            rpmUsed = rpm,
+                            rpdUsed = rpd,
+                            hasApiKey = encryptedPrefs.getApiKey(entity.id) != null
+                        )
+                    }
+                    _uiState.update { it.copy(providers = withUsage) }
                 }
-                _uiState.update { it.copy(providers = withUsage) }
-            }
         }
     }
 
@@ -66,6 +72,12 @@ class ProvidersViewModel @Inject constructor(
 
     fun saveApiKey(providerId: String, apiKey: String) {
         encryptedPrefs.storeApiKey(providerId, apiKey.trim())
+        _keyVersion.update { it + 1 }
+    }
+
+    fun removeApiKey(providerId: String) {
+        encryptedPrefs.removeApiKey(providerId)
+        _keyVersion.update { it + 1 }
     }
 
     fun addCustomProvider(
@@ -92,7 +104,10 @@ class ProvidersViewModel @Inject constructor(
                     contextWindow = contextWindow, maxOutput = maxOutput
                 )
             ))
-            if (apiKey.isNotBlank()) encryptedPrefs.storeApiKey(id, apiKey)
+            if (apiKey.isNotBlank()) {
+                encryptedPrefs.storeApiKey(id, apiKey)
+                _keyVersion.update { it + 1 }
+            }
         }
     }
 
@@ -101,6 +116,7 @@ class ProvidersViewModel @Inject constructor(
             if (!entity.isCustom) return@launch
             providerConfigDao.delete(entity)
             encryptedPrefs.removeApiKey(entity.id)
+            _keyVersion.update { it + 1 }
         }
     }
 

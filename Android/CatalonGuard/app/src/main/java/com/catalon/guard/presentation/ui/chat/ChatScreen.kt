@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.catalon.guard.domain.model.ChatMessage
-import com.catalon.guard.domain.model.HandoffEvent
 import com.catalon.guard.presentation.theme.*
 import com.catalon.guard.presentation.viewmodel.ChatViewModel
 
@@ -59,11 +58,66 @@ fun ChatScreen(
             TopAppBar(
                 title = { Text("Catalon Guard", fontWeight = FontWeight.Bold) },
                 actions = {
-                    if (state.currentProviderId.isNotEmpty()) {
-                        ProviderBadge(state.currentProviderId)
+                    val badgeLabel = when {
+                        state.selectedProviderName.isNotEmpty() -> state.selectedProviderName
+                        state.availableProviders.isNotEmpty() -> state.availableProviders.first().name
+                        else -> null
+                    }
+                    if (badgeLabel != null) {
+                        Box {
+                            ProviderBadge(
+                                label = badgeLabel,
+                                onClick = { viewModel.toggleProviderPicker() }
+                            )
+                            DropdownMenu(
+                                expanded = state.showProviderPicker,
+                                onDismissRequest = { viewModel.toggleProviderPicker() }
+                            ) {
+                                Text(
+                                    "Provider wählen",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                                HorizontalDivider()
+                                state.availableProviders.forEach { provider ->
+                                    val isSelected = provider.id == state.selectedProviderId
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(provider.name)
+                                                if (isSelected) {
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Icon(
+                                                        Icons.Default.Check, null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        onClick = { viewModel.selectProvider(provider) },
+                                        leadingIcon = {
+                                            Surface(
+                                                color = tierColor(provider.tier).copy(alpha = 0.15f),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    "T${provider.tier}",
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = tierColor(provider.tier),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                     IconButton(onClick = { viewModel.newSession() }) {
-                        Icon(Icons.Default.Add, "New Chat")
+                        Icon(Icons.Default.Add, "Neuer Chat")
                     }
                 }
             )
@@ -82,15 +136,13 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (state.messages.isEmpty() && !state.isStreaming) {
-                    item { WelcomeCard() }
+                    item { WelcomeCard(hasProviders = state.availableProviders.isNotEmpty()) }
                 }
                 items(state.messages) { msg ->
                     MessageBubble(msg)
                 }
                 if (state.isStreaming && state.streamingText.isNotEmpty()) {
-                    item {
-                        StreamingBubble(state.streamingText, state.currentProviderId)
-                    }
+                    item { StreamingBubble(state.streamingText) }
                 }
                 if (state.isStreaming && state.streamingText.isEmpty()) {
                     item { ThinkingIndicator() }
@@ -105,25 +157,43 @@ fun ChatScreen(
                 text = state.inputText,
                 onTextChange = { viewModel.onInputChanged(it) },
                 onSend = { viewModel.sendMessage() },
-                isStreaming = state.isStreaming
+                isStreaming = state.isStreaming,
+                enabled = state.availableProviders.isNotEmpty()
             )
         }
     }
 }
 
 @Composable
-private fun ProviderBadge(providerId: String) {
+private fun ProviderBadge(label: String, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.padding(end = 8.dp)
+        modifier = Modifier.padding(end = 4.dp)
     ) {
-        Text(
-            text = providerId,
+        Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.SmartToy, null,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(Modifier.width(2.dp))
+            Icon(
+                Icons.Default.ArrowDropDown, null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
     }
 }
 
@@ -178,7 +248,7 @@ private fun MessageBubble(message: ChatMessage) {
 }
 
 @Composable
-private fun StreamingBubble(text: String, providerId: String) {
+private fun StreamingBubble(text: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Box(
             modifier = Modifier.size(32.dp).clip(CircleShape)
@@ -221,17 +291,44 @@ private fun ThinkingIndicator() {
 }
 
 @Composable
-private fun WelcomeCard() {
+private fun WelcomeCard(hasProviders: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("Welcome to Catalon Guard", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Willkommen bei Catalon Guard",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.height(8.dp))
-            Text("Unified LLM router with automatic failover across 14+ providers.", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(4.dp))
-            Text("Add API keys in Settings → Providers to get started.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            Text(
+                "Unified LLM-Router mit automatischem Failover über 14+ Provider.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            if (hasProviders) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CheckCircle, null, tint = BabuTeal, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Provider bereit – einfach losschreiben.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BabuTeal
+                    )
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Warning, null, tint = AccentAmber, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Bitte API-Keys im Tab «Providers» hinterlegen.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AccentAmber
+                    )
+                }
+            }
         }
     }
 }
@@ -247,7 +344,7 @@ private fun ErrorBanner(error: String, onDismiss: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text(error, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Default.Close, "Dismiss")
+                Icon(Icons.Default.Close, "Schließen")
             }
         }
     }
@@ -258,7 +355,8 @@ private fun ChatInputBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    isStreaming: Boolean
+    isStreaming: Boolean,
+    enabled: Boolean
 ) {
     Row(
         modifier = Modifier
@@ -270,18 +368,31 @@ private fun ChatInputBar(
             value = text,
             onValueChange = onTextChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Message...") },
+            placeholder = {
+                Text(
+                    if (enabled) "Nachricht…"
+                    else "Bitte zuerst API-Key in Providers hinterlegen"
+                )
+            },
             maxLines = 5,
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(24.dp),
+            enabled = enabled && !isStreaming
         )
         Spacer(Modifier.width(8.dp))
         FloatingActionButton(
-            onClick = { if (!isStreaming) onSend() },
-            containerColor = if (isStreaming) MaterialTheme.colorScheme.outline
-                            else MaterialTheme.colorScheme.primary,
+            onClick = { if (!isStreaming && enabled) onSend() },
+            containerColor = when {
+                !enabled -> MaterialTheme.colorScheme.surfaceVariant
+                isStreaming -> MaterialTheme.colorScheme.outline
+                else -> MaterialTheme.colorScheme.primary
+            },
             modifier = Modifier.size(48.dp)
         ) {
-            Icon(if (isStreaming) Icons.Default.HourglassEmpty else Icons.AutoMirrored.Filled.Send, "Send")
+            Icon(
+                if (isStreaming) Icons.Default.HourglassEmpty else Icons.AutoMirrored.Filled.Send,
+                "Senden",
+                tint = if (!enabled) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+            )
         }
     }
 }

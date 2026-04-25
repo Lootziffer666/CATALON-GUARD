@@ -35,7 +35,8 @@ class ChatUseCase @Inject constructor(
 
     fun chat(
         messages: List<ChatMessage>,
-        sessionId: String
+        sessionId: String,
+        preferredProviderId: String? = null
     ): Flow<ChatResult> = flow {
         val memories = memoryUseCase.retrieveRelevant(
             messages.lastOrNull { it.role == "user" }?.content ?: "", sessionId
@@ -45,6 +46,16 @@ class ChatUseCase @Inject constructor(
         val lastUserMsg = messages.lastOrNull { it.role == "user" }?.content ?: ""
         val specialty = skillRouter.detectSpecialty(lastUserMsg)
         val providers = rateLimitTracker.getRankedAvailableProviders(specialty).toMutableList()
+
+        // Move user-selected provider to front of the list
+        if (preferredProviderId != null) {
+            val preferred = providers.find { it.id == preferredProviderId }
+            if (preferred != null) {
+                providers.remove(preferred)
+                providers.add(0, preferred)
+            }
+        }
+
         val triedIds = mutableSetOf<String>()
         val accumulated = StringBuilder()
         val startTime = System.currentTimeMillis()

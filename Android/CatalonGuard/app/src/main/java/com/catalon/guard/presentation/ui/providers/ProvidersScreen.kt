@@ -12,8 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,7 +41,7 @@ fun ProvidersScreen(
             ExtendedFloatingActionButton(
                 onClick = { viewModel.showAddDialog() },
                 icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("Add Provider") },
+                text = { Text("Provider hinzufügen") },
                 containerColor = MaterialTheme.colorScheme.primary
             )
         }
@@ -75,8 +75,8 @@ fun ProvidersScreen(
 
     if (state.showAddDialog) {
         AddProviderDialog(
-            onConfirm = { name, url, key, rpm, rpd, ctx, out, model, tier, byok ->
-                viewModel.addCustomProvider(name, url, key, rpm, rpd, ctx, out, model, tier, byok)
+            onConfirm = { name, url, key, rpm, rpd, ctx, out, model, tier, isByok ->
+                viewModel.addCustomProvider(name, url, key, rpm, rpd, ctx, out, model, tier, isByok)
                 viewModel.hideAddDialog()
             },
             onDismiss = { viewModel.hideAddDialog() }
@@ -105,11 +105,21 @@ private fun ProviderCard(
     val entity = pw.entity
     val uriHandler = LocalUriHandler.current
 
+    // For BYOK providers without a key, visually communicate they're not usable yet
+    val needsKey = entity.isByok && !pw.hasApiKey
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (needsKey && entity.enabled)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Header row: name + chips + toggle
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -120,12 +130,25 @@ private fun ProviderCard(
                             Spacer(Modifier.width(4.dp))
                             ByokChip()
                         }
+                        if (pw.hasApiKey) {
+                            Spacer(Modifier.width(4.dp))
+                            KeySetChip()
+                        }
                     }
-                    Text(
-                        entity.baseUrl,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    // Clickable base URL
+                    TextButton(
+                        onClick = {
+                            if (entity.baseUrl.startsWith("http")) uriHandler.openUri(entity.baseUrl)
+                        },
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(20.dp)
+                    ) {
+                        Text(
+                            entity.baseUrl,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
                 Switch(
                     checked = entity.enabled,
@@ -135,6 +158,7 @@ private fun ProviderCard(
 
             Spacer(Modifier.height(8.dp))
 
+            // Rate limit gauges
             if (entity.rpmLimit < Int.MAX_VALUE) {
                 RateLimitGauge("RPM", pw.rpmUsed, entity.rpmLimit)
                 Spacer(Modifier.height(4.dp))
@@ -144,33 +168,36 @@ private fun ProviderCard(
                 Spacer(Modifier.height(4.dp))
             }
 
+            // Key row
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    if (pw.hasApiKey) Icons.Default.Key else Icons.Default.KeyOff,
-                    null,
-                    tint = if (pw.hasApiKey) MaterialTheme.colorScheme.secondary
-                           else MaterialTheme.colorScheme.outline,
+                    imageVector = if (pw.hasApiKey) Icons.Default.Key else Icons.Default.KeyOff,
+                    contentDescription = null,
+                    tint = if (pw.hasApiKey) BabuTeal else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    if (pw.hasApiKey) "API key set" else "No API key",
+                    text = if (pw.hasApiKey) "API-Key hinterlegt" else "Kein API-Key",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = if (pw.hasApiKey) BabuTeal else MaterialTheme.colorScheme.outline
                 )
                 Spacer(Modifier.weight(1f))
-                if (!pw.hasApiKey && entity.registrationUrl.isNotEmpty()) {
+
+                // "Get Key" button: show when URL is known
+                if (entity.registrationUrl.isNotEmpty()) {
                     TextButton(onClick = { uriHandler.openUri(entity.registrationUrl) }) {
                         Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Get Key", style = MaterialTheme.typography.labelSmall)
+                        Text("Key holen", style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 TextButton(onClick = { showKeyInput = !showKeyInput }) {
-                    Text(if (showKeyInput) "Cancel" else "Set Key")
+                    Text(if (showKeyInput) "Abbrechen" else if (pw.hasApiKey) "Ändern" else "Key setzen")
                 }
             }
 
+            // Key input field
             if (showKeyInput) {
                 OutlinedTextField(
                     value = apiKeyText,
@@ -182,21 +209,36 @@ private fun ProviderCard(
                                            else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { showKey = !showKey }) {
-                            Icon(if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility, null)
+                            Icon(
+                                if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                null
+                            )
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                 )
                 Spacer(Modifier.height(4.dp))
-                Button(
-                    onClick = {
-                        viewModel.saveApiKey(entity.id, apiKeyText)
-                        showKeyInput = false
-                        apiKeyText = ""
-                    },
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Text("Save")
+                    if (pw.hasApiKey) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.removeApiKey(entity.id)
+                                showKeyInput = false
+                                apiKeyText = ""
+                            }
+                        ) { Text("Entfernen") }
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.saveApiKey(entity.id, apiKeyText)
+                            showKeyInput = false
+                            apiKeyText = ""
+                        },
+                        enabled = apiKeyText.isNotBlank()
+                    ) { Text("Speichern") }
                 }
             }
         }
@@ -229,6 +271,25 @@ private fun ByokChip() {
             color = ByokColor,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+@Composable
+private fun KeySetChip() {
+    Surface(color = BabuTeal.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Check, null, tint = BabuTeal, modifier = Modifier.size(10.dp))
+            Spacer(Modifier.width(2.dp))
+            Text(
+                "Key",
+                style = MaterialTheme.typography.labelSmall,
+                color = BabuTeal,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -281,13 +342,19 @@ private fun AddProviderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Custom Provider") },
+        title = { Text("Custom Provider hinzufügen") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("Name*") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(baseUrl, { baseUrl = it }, label = { Text("Base URL*") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(modelId, { modelId = it }, label = { Text("Model ID*") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API Key") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(
+                    apiKey, { apiKey = it },
+                    label = { Text("API Key") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(rpmLimit, { rpmLimit = it }, label = { Text("RPM") }, modifier = Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     OutlinedTextField(rpdLimit, { rpdLimit = it }, label = { Text("RPD") }, modifier = Modifier.weight(1f), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), placeholder = { Text("∞") })
@@ -316,8 +383,8 @@ private fun AddProviderDialog(
                     )
                 },
                 enabled = name.isNotBlank() && baseUrl.length > 10 && modelId.isNotBlank()
-            ) { Text("Add") }
+            ) { Text("Hinzufügen") }
         },
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onDismiss) { Text("Abbrechen") } }
     )
 }
