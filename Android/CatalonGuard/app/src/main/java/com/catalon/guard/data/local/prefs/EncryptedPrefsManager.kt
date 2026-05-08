@@ -68,4 +68,10 @@ class EncryptedPrefsManager @Inject constructor(
 
     fun getString(key: String, default: String? = null): String? =
         prefs.getString(key, default)
+
+    fun getOrCreateLocalApiToken(): String {
+        return getString("local_api_token") ?: java.util.UUID.randomUUID().toString().also {
+            storeString("local_api_token", it)
+        }
+    }
 }

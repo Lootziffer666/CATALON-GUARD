@@ -19,7 +19,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "catalon_guard.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -31,4 +31,5 @@ object DatabaseModule {
     @Provides fun provideConversationMessageDao(db: AppDatabase) = db.conversationMessageDao()
     @Provides fun provideMemoryChunkDao(db: AppDatabase) = db.memoryChunkDao()
     @Provides fun provideHandoffLogDao(db: AppDatabase) = db.handoffLogDao()
+    @Provides fun provideAgentPresetDao(db: AppDatabase) = db.agentPresetDao()
 }

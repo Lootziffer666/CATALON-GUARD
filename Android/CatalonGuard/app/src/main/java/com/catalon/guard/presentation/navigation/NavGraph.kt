@@ -6,14 +6,18 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import com.catalon.guard.presentation.ui.agents.AgentPresetEditorScreen
+import com.catalon.guard.presentation.ui.chat.ChatOverviewScreen
 import com.catalon.guard.presentation.ui.chat.ChatScreen
 import com.catalon.guard.presentation.ui.providers.ProvidersScreen
 import com.catalon.guard.presentation.ui.projects.ProjectsScreen
 import com.catalon.guard.presentation.ui.quota.QuotaDashboardScreen
 import com.catalon.guard.presentation.ui.settings.SettingsScreen
+import com.catalon.guard.presentation.viewmodel.ChatViewModel
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Chat : Screen("chat", "Chat", Icons.AutoMirrored.Filled.Chat)
@@ -27,9 +31,19 @@ val bottomNavScreens = listOf(
     Screen.Chat, Screen.Providers, Screen.Projects, Screen.Quota, Screen.Settings
 )
 
+// Destination routes not in the bottom nav bar
+private object Routes {
+    const val CHAT_DETAIL = "chat/{presetId}"
+    const val AGENT_EDITOR = "agents/edit/{presetId}"
+    const val AGENT_NEW = "agents/edit/new"
+}
+
 @Composable
 fun AppNavHost() {
     val navController = rememberNavController()
+    // Shared ChatViewModel so overview and chat screen share the same instance
+    val chatViewModel: ChatViewModel = hiltViewModel()
+
     Scaffold(
         bottomBar = {
             NavigationBar {
@@ -53,7 +67,45 @@ fun AppNavHost() {
         }
     ) { innerPadding ->
         NavHost(navController = navController, startDestination = Screen.Chat.route) {
-            composable(Screen.Chat.route) { ChatScreen(innerPadding) }
+            // Chat overview — agent/preset picker
+            composable(Screen.Chat.route) {
+                ChatOverviewScreen(
+                    paddingValues = innerPadding,
+                    onStartPreset = { preset ->
+                        chatViewModel.startPresetChat(preset)
+                        navController.navigate("chat/${preset.id}")
+                    },
+                    onEditPreset = { presetId ->
+                        navController.navigate("agents/edit/$presetId")
+                    },
+                    onNewPreset = {
+                        navController.navigate(Routes.AGENT_NEW)
+                    }
+                )
+            }
+
+            // Active chat conversation
+            composable("chat/{presetId}") {
+                ChatScreen(paddingValues = innerPadding, viewModel = chatViewModel)
+            }
+
+            // Agent preset editor (existing preset)
+            composable("agents/edit/{presetId}") { backStackEntry ->
+                val presetId = backStackEntry.arguments?.getString("presetId")
+                AgentPresetEditorScreen(
+                    presetId = presetId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // Agent preset editor (new preset)
+            composable(Routes.AGENT_NEW) {
+                AgentPresetEditorScreen(
+                    presetId = null,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.Providers.route) { ProvidersScreen(innerPadding) }
             composable(Screen.Projects.route) { ProjectsScreen(innerPadding) }
             composable(Screen.Quota.route) { QuotaDashboardScreen(innerPadding) }
