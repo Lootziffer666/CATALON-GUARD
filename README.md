@@ -1,35 +1,61 @@
-# ANVIL-BELLOWS
+<h1 align="center">🛡 ANVIL-BELLOWS</h1>
 
-## Purpose
+<p align="center">
+  <strong>LLM Router & Multi-CustomOpenAI Toolkit</strong>
+</p>
 
-Anvil Bellows is an LLM Router & Multi-CustomOpenAI Toolkit with budget guarding, quota management, and agent presets. It includes an Android app and a Next.js control surface GUI.
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-Kotlin%20|%20Compose-green?style=flat-square" />
+  <img src="https://img.shields.io/badge/Web-Next.js%20|%20TypeScript-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/Python-Proxy%20|%20Budget%20Guard-yellow?style=flat-square" />
+  <img src="https://img.shields.io/badge/Design-IIG%20System-red?style=flat-square" />
+</p>
 
-## Design System
+---
 
-The GUI uses the **Ink & Iron Glow (IIG) Design System** with two material themes:
+## 🧭 Purpose
 
-- **Warm Paper** (Light) — Cream, sand, warm ink. Oxidrot primary, Amber focus.
-- **Charcoal Room** (Dark) — Deep anthracite, glowing red, metallic amber. Non-linear material shift (not a simple inversion).
+LLM Router & Multi-CustomOpenAI Toolkit mit Budget Guarding, Quota Management und Agent Presets. Android App + Next.js Control Surface.
 
-Key principles:
-- Editorial grid layout with Rail, Topbar, Main Canvas, Annotation Sidebar
-- Three font families: Bebas Neue (display), Source Sans 3 (body), Merriweather (annotations)
-- Semantic Seal system instead of generic icons
-- Permanent annotation margins instead of hidden tooltips
-- Surface noise texture for tactile paper feel
+---
 
-## Current Status
+## 🎨 IIG Design System
 
-Active development. Android app + Next.js GUI both use IIG design tokens.
+| Theme | Beschreibung |
+|-------|-------------|
+| **Warm Paper** (Light) | Cream, Sand, warm ink. Oxidrot primary. |
+| **Charcoal Room** (Dark) | Deep anthracite, glowing red, metallic amber. |
 
-## Architecture
+**Prinzipien:** Editorial Grid · Semantic Seals · Permanent Annotation Margins · Surface Noise Texture
+
+---
+
+## 🏗 Architektur
 
 ```
-Android/AnvilBellows/   — Android app (Kotlin, Compose, Material3, IIG theme)
-src/                    — Next.js control surface GUI (IIG Design System)
-anvil-bellows/          — Python proxy + budget guard
+Android/AnvilBellows/   — Android App (Kotlin, Compose, IIG)
+src/                    — Next.js GUI (IIG Design System)
+anvil-bellows/          — Python Proxy + Budget Guard
 ```
 
-## Related Repositories
+---
 
-- [ANVIL](https://github.com/Lootziffer666/ANVIL) — Core framework
+## 🚪 Gates
+
+Siehe [`GATES.md`](GATES.md).
+
+## 🔗 Verwandt: [ANVIL](https://github.com/Lootziffer666/ANVIL)
+
+---
+
+## 🔗 Relevante Projekte
+
+| Projekt | Relevanz |
+|---------|----------|
+| [rickcrawford/tokenomics](https://github.com/rickcrawford/tokenomics) | AI Gateway mit Budget |
+| [seawall-io/lobster-trap](https://github.com/seawall-io/lobster-trap) | AI Gateway + Token Budget |
+| [nguyenphutrong/quotio](https://github.com/nguyenphutrong/quotio) | AI Proxy Manager |
+
+---
+
+<p align="center"><em>Routet. Budgetiert. Kontrolliert.</em></p>
